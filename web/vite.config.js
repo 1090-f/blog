@@ -8,11 +8,7 @@ export default defineConfig(({ mode }) => ({
     port: mode === 'admin' ? 3001 : 3000,
     strictPort: true,
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/admin-api': {
-        target: 'http://localhost:8081',
-        rewrite: path => path.replace(/^\/admin-api/, '/api')
-      },
+      '/api': mode === 'admin' ? 'http://localhost:8081' : 'http://localhost:8080',
       '/uploads': 'http://localhost:8080'
     }
   }

@@ -61,3 +61,15 @@ func Auth(secret string, userDAO UserReader) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// OptionalAuth identifies a logged-in visitor when a bearer token is present,
+// while allowing unauthenticated requests to continue.
+func OptionalAuth(secret string, userDAO UserReader) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetHeader("Authorization") == "" {
+			c.Next()
+			return
+		}
+		Auth(secret, userDAO)(c)
+	}
+}

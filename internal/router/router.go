@@ -72,11 +72,11 @@ func registerRoutes(engine *gin.Engine, cfg config.Config, db *gorm.DB, adminSer
 
 	api := engine.Group("/api")
 	registerAuthRoutes(api, authController)
-	registerPublicRoutes(api, categoryController, tagController, articleController, commentController, siteStatsController, activityController)
+	registerPublicRoutes(api, cfg, categoryController, tagController, articleController, commentController, siteStatsController, activityController, userDAO)
 	if !uploadConfigured {
 		uploadController = nil
 	}
-	registerUserRoutes(api, cfg, authController, userController, categoryController, articleController, commentController, uploadController, userDAO)
+	registerUserRoutes(api, cfg, authController, categoryController, articleController, commentController, uploadController, userDAO)
 	if adminServer {
 		registerAdminRoutes(api, cfg, adminController, adminCommentController, userController, categoryController, tagController, articleController, userDAO)
 	}

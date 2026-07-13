@@ -10,10 +10,9 @@ import (
 )
 
 type fakeAdminUserStore struct {
-	listFn          func(filter dao.UserListFilter) ([]model.User, int64, error)
-	findByIDFn      func(id uint) (*model.User, error)
-	updateStatusFn  func(id uint, status int8) error
-	updateProfileFn func(id uint, nickname, avatar string) error
+	listFn         func(filter dao.UserListFilter) ([]model.User, int64, error)
+	findByIDFn     func(id uint) (*model.User, error)
+	updateStatusFn func(id uint, status int8) error
 }
 
 func (f *fakeAdminUserStore) List(filter dao.UserListFilter) ([]model.User, int64, error) {
@@ -26,10 +25,6 @@ func (f *fakeAdminUserStore) FindByID(id uint) (*model.User, error) {
 
 func (f *fakeAdminUserStore) UpdateStatus(id uint, status int8) error {
 	return f.updateStatusFn(id, status)
-}
-
-func (f *fakeAdminUserStore) UpdateProfile(id uint, nickname, avatar string) error {
-	return f.updateProfileFn(id, nickname, avatar)
 }
 
 func TestAdminUserListReturnsPagination(t *testing.T) {
@@ -54,37 +49,5 @@ func TestUpdateUserStatusRejectsInvalidStatus(t *testing.T) {
 	_, err := svc.UpdateStatus(1, dto.UpdateUserStatusRequest{Status: 2})
 	if err != service.ErrInvalidUserStatus {
 		t.Fatalf("expected ErrInvalidUserStatus, got %v", err)
-	}
-}
-
-func TestUpdateProfileTrimsAndPersistsFields(t *testing.T) {
-	store := &fakeAdminUserStore{
-		findByIDFn: func(id uint) (*model.User, error) {
-			return &model.User{ID: id, Username: "alice", Nickname: "Alice", Avatar: ""}, nil
-		},
-		updateProfileFn: func(id uint, nickname, avatar string) error {
-			if id != 1 {
-				t.Fatalf("expected id 1, got %d", id)
-			}
-			if nickname != "Alice Cooper" {
-				t.Fatalf("expected trimmed nickname, got %q", nickname)
-			}
-			if avatar != "/uploads/avatar.png" {
-				t.Fatalf("expected avatar persisted, got %q", avatar)
-			}
-			return nil
-		},
-	}
-
-	svc := service.NewUserService(store)
-	user, err := svc.UpdateProfile(1, dto.UpdateProfileRequest{
-		Nickname: "  Alice Cooper  ",
-		Avatar:   " /uploads/avatar.png ",
-	})
-	if err != nil {
-		t.Fatalf("expected success, got error: %v", err)
-	}
-	if user.ID != 1 {
-		t.Fatalf("expected user id 1, got %d", user.ID)
 	}
 }

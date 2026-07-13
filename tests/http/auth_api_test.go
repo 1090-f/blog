@@ -68,16 +68,6 @@ func (f *fakeHTTPAuthUserStore) UpdateStatus(id uint, status int8) error {
 	return nil
 }
 
-func (f *fakeHTTPAuthUserStore) UpdateProfile(id uint, nickname, avatar string) error {
-	user, ok := f.usersByID[id]
-	if !ok {
-		return gorm.ErrRecordNotFound
-	}
-	user.Nickname = nickname
-	user.Avatar = avatar
-	return nil
-}
-
 func TestRegisterRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -100,7 +90,7 @@ func TestRegisterRoute(t *testing.T) {
 	}
 }
 
-func TestProfileRouteRequiresAuth(t *testing.T) {
+func TestSessionRouteRequiresAuth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	store := &fakeHTTPAuthUserStore{}
@@ -110,9 +100,9 @@ func TestProfileRouteRequiresAuth(t *testing.T) {
 	r := gin.New()
 	protected := r.Group("/api/user")
 	protected.Use(middleware.Auth("secret", store))
-	protected.GET("/profile", authController.Profile)
+	protected.GET("/session", authController.Session)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/user/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/user/session", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -121,7 +111,7 @@ func TestProfileRouteRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestLoginThenProfileRoute(t *testing.T) {
+func TestLoginThenSessionRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	store := &fakeHTTPAuthUserStore{}
@@ -139,7 +129,7 @@ func TestLoginThenProfileRoute(t *testing.T) {
 	r.POST("/api/auth/login", authController.Login)
 	protected := r.Group("/api/user")
 	protected.Use(middleware.Auth("secret", store))
-	protected.GET("/profile", authController.Profile)
+	protected.GET("/session", authController.Session)
 
 	loginBody := []byte(`{"username":"alice","password":"123456"}`)
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginBody))
@@ -162,69 +152,12 @@ func TestLoginThenProfileRoute(t *testing.T) {
 		t.Fatalf("expected login response user alice, got %q", loginResp.Data.User.Username)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/user/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/user/session", nil)
 	req.Header.Set("Authorization", "Bearer "+loginResp.Data.Token)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-}
-
-func TestUpdateProfileRoute(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	store := &fakeHTTPAuthUserStore{}
-	authService := service.NewAuthService(store, "secret", 7200)
-	authController := controller.NewAuthController(authService)
-	userService := service.NewUserService(store)
-	userController := controller.NewUserController(userService)
-
-	registerReq := dto.RegisterRequest{Username: "alice", Password: "123456", Nickname: "Alice"}
-	user, err := authService.Register(registerReq)
-	if err != nil {
-		t.Fatalf("seed register failed: %v", err)
-	}
-	store.usersByID[user.ID] = user
-
-	r := gin.New()
-	r.POST("/api/auth/login", authController.Login)
-	protected := r.Group("/api/user")
-	protected.Use(middleware.Auth("secret", store))
-	protected.PUT("/profile", userController.UpdateProfile)
-
-	loginBody := []byte(`{"username":"alice","password":"123456"}`)
-	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginBody))
-	loginReq.Header.Set("Content-Type", "application/json")
-	loginRec := httptest.NewRecorder()
-	r.ServeHTTP(loginRec, loginReq)
-
-	var loginResp struct {
-		Data struct {
-			Token string `json:"token"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(loginRec.Body.Bytes(), &loginResp); err != nil {
-		t.Fatalf("unmarshal login response failed: %v", err)
-	}
-
-	updateBody := []byte(`{"nickname":"Alice New","avatar":"/uploads/avatar.png"}`)
-	req := httptest.NewRequest(http.MethodPut, "/api/user/profile", bytes.NewReader(updateBody))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+loginResp.Data.Token)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-
-	updated, err := store.FindByID(user.ID)
-	if err != nil {
-		t.Fatalf("find updated user failed: %v", err)
-	}
-	if updated.Nickname != "Alice New" || updated.Avatar != "/uploads/avatar.png" {
-		t.Fatalf("profile not updated: nickname=%q avatar=%q", updated.Nickname, updated.Avatar)
 	}
 }

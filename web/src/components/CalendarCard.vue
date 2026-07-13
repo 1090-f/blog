@@ -50,9 +50,11 @@ const daysInMonth = computed(() => new Date(
 
 const activityByDay = ref({})
 const maxActivity = computed(() => Math.max(1, ...Object.values(activityByDay.value)))
-const activityLevels = computed(() => Array.from({ length: 60 }, (_, index) => {
-  const day = index + 1
-  if (day > daysInMonth.value) return 0
+const activityLevels = computed(() => {
+  const cellCount = Math.ceil((firstWeekday.value + daysInMonth.value) / 7) * 7
+  return Array.from({ length: cellCount }, (_, index) => {
+  const day = index - firstWeekday.value + 1
+  if (day < 1 || day > daysInMonth.value) return 0
 
   const activity = activityByDay.value[day] || 0
   if (activity === 0) return 0
@@ -60,7 +62,8 @@ const activityLevels = computed(() => Array.from({ length: 60 }, (_, index) => {
   if (ratio >= .75) return 3
   if (ratio >= .4) return 2
   return 1
-}))
+  })
+})
 
 function changeMonth(offset) {
   const nextMonth = new Date(
@@ -212,7 +215,7 @@ button.calendar-day:hover {
 
 .calendar-activity {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
   margin-top: 18px;
   padding-top: 14px;

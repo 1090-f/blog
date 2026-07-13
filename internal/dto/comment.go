@@ -15,9 +15,12 @@ type UpdateCommentStatusRequest struct {
 }
 
 type CreateCommentRequest struct {
-	ArticleID uint   `json:"articleId" binding:"required"`
-	ReplyToID *uint  `json:"replyToId"`
-	Content   string `json:"content" binding:"required"`
+	ArticleID    uint   `json:"articleId" binding:"required"`
+	ReplyToID    *uint  `json:"replyToId"`
+	Content      string `json:"content" binding:"required"`
+	GuestName    string `json:"guestName"`
+	GuestEmail   string `json:"guestEmail"`
+	GuestWebsite string `json:"guestWebsite"`
 }
 
 type CommentAuthorResponse struct {
@@ -25,12 +28,13 @@ type CommentAuthorResponse struct {
 	Username string `json:"username"`
 	Nickname string `json:"nickname"`
 	Avatar   string `json:"avatar"`
+	Website  string `json:"website"`
 }
 
 type CommentResponse struct {
 	ID            uint                   `json:"id"`
 	ArticleID     uint                   `json:"articleId"`
-	UserID        uint                   `json:"userId"`
+	UserID        *uint                  `json:"userId"`
 	ParentID      *uint                  `json:"parentId"`
 	ReplyToID     *uint                  `json:"replyToId"`
 	Content       string                 `json:"content"`
@@ -43,7 +47,7 @@ type AdminCommentResponse struct {
 	ID           uint      `json:"id"`
 	ArticleID    uint      `json:"articleId"`
 	ArticleTitle string    `json:"articleTitle"`
-	UserID       uint      `json:"userId"`
+	UserID       *uint     `json:"userId"`
 	Username     string    `json:"username"`
 	Nickname     string    `json:"nickname"`
 	ParentID     *uint     `json:"parentId"`

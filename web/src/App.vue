@@ -8,7 +8,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import AppMessages from './components/AppMessages.vue'
-import { getProfile } from './api/auth'
+import { getCurrentUser } from './api/auth'
 import { useUserStore } from './stores/user'
 
 const userStore = useUserStore()
@@ -19,7 +19,7 @@ onMounted(async () => {
   }
 
   try {
-    const res = await getProfile()
+    const res = await getCurrentUser()
     userStore.setAuth(userStore.token, res.data)
   } catch (error) {
     // Expired tokens are handled by the request interceptor.

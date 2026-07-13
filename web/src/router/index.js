@@ -13,8 +13,7 @@ const routes = [
       { path: 'archive', name: 'Archive', component: () => import('../views/front/Archive.vue') },
       { path: 'about', name: 'About', component: () => import('../views/front/About.vue') },
       { path: 'article/:id', name: 'Article', component: () => import('../views/front/Article.vue') },
-      { path: 'write', name: 'WriteArticle', component: () => import('../views/front/WriteArticle.vue'), meta: { requiresAuth: true } },
-      { path: 'profile', name: 'Profile', component: () => import('../views/front/Profile.vue'), meta: { requiresAuth: true } }
+      { path: 'write', name: 'WriteArticle', component: () => import('../views/front/WriteArticle.vue'), meta: { requiresAuth: true } }
     ]
   },
   { path: '/login', name: 'Login', component: () => import('../views/front/Login.vue') },

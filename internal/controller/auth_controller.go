@@ -67,10 +67,10 @@ func (ctl *AuthController) Login(c *gin.Context) {
 	response.Success(c, loginResponse)
 }
 
-func (ctl *AuthController) Profile(c *gin.Context) {
+func (ctl *AuthController) Session(c *gin.Context) {
 	userID := c.GetUint("userID")
 
-	user, err := ctl.authService.Profile(userID)
+	user, err := ctl.authService.CurrentUser(userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
@@ -78,7 +78,7 @@ func (ctl *AuthController) Profile(c *gin.Context) {
 		case errors.Is(err, service.ErrUserDisabled):
 			response.Error(c, http.StatusForbidden, 4031, err.Error())
 		default:
-			response.Error(c, http.StatusInternalServerError, 5003, "failed to fetch profile")
+			response.Error(c, http.StatusInternalServerError, 5003, "failed to fetch current user")
 		}
 		return
 	}

@@ -54,7 +54,11 @@ func (ctl *CommentController) Create(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, 4043, err.Error())
 		case errors.Is(err, service.ErrCommentNotFound):
 			response.Error(c, http.StatusNotFound, 4044, err.Error())
-		case errors.Is(err, service.ErrInvalidComment):
+		case errors.Is(err, service.ErrInvalidComment),
+			errors.Is(err, service.ErrGuestNameRequired),
+			errors.Is(err, service.ErrGuestEmailRequired),
+			errors.Is(err, service.ErrInvalidGuestEmail),
+			errors.Is(err, service.ErrInvalidGuestWebsite):
 			response.Error(c, http.StatusBadRequest, 4005, err.Error())
 		default:
 			response.Error(c, http.StatusInternalServerError, 5016, "failed to create comment")
@@ -104,22 +108,29 @@ func toCommentResponse(comment model.Comment) dto.CommentResponse {
 		ReplyToID: comment.ReplyToID,
 		Content:   comment.Content,
 		CreatedAt: comment.CreatedAt,
-		Author: dto.CommentAuthorResponse{
+		Author:    commentAuthor(comment),
+	}
+
+	if comment.ReplyTo != nil {
+		author := commentAuthor(*comment.ReplyTo)
+		resp.ReplyToAuthor = &author
+	}
+
+	return resp
+}
+
+func commentAuthor(comment model.Comment) dto.CommentAuthorResponse {
+	if comment.User != nil {
+		return dto.CommentAuthorResponse{
 			ID:       comment.User.ID,
 			Username: comment.User.Username,
 			Nickname: comment.User.Nickname,
 			Avatar:   comment.User.Avatar,
-		},
-	}
-
-	if comment.ReplyTo != nil {
-		resp.ReplyToAuthor = &dto.CommentAuthorResponse{
-			ID:       comment.ReplyTo.User.ID,
-			Username: comment.ReplyTo.User.Username,
-			Nickname: comment.ReplyTo.User.Nickname,
-			Avatar:   comment.ReplyTo.User.Avatar,
 		}
 	}
 
-	return resp
+	return dto.CommentAuthorResponse{
+		Nickname: comment.GuestName,
+		Website:  comment.GuestWebsite,
+	}
 }

@@ -8,10 +8,6 @@ const request = axios.create({
   timeout: 10000
 })
 
-function isAdminPage() {
-  return import.meta.env.MODE === 'admin' || window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
-}
-
 let isHandlingExpiredToken = false
 
 function handleExpiredToken() {
@@ -38,7 +34,9 @@ function handleExpiredToken() {
 }
 
 request.interceptors.request.use(config => {
-  config.baseURL = isAdminPage() ? '/admin-api' : '/api'
+  // The public and admin applications are served by different origins in
+  // production, so both can use their own same-origin /api endpoint.
+  config.baseURL = '/api'
   const userStore = useUserStore()
   if (userStore.token) {
     config.headers.Authorization = `Bearer ${userStore.token}`

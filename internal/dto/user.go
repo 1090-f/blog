@@ -14,11 +14,6 @@ type UpdateUserStatusRequest struct {
 	Status int8 `json:"status" binding:"oneof=0 1"`
 }
 
-type UpdateProfileRequest struct {
-	Nickname string `json:"nickname" binding:"required,min=2,max=50"`
-	Avatar   string `json:"avatar" binding:"max=255"`
-}
-
 type AdminUserResponse struct {
 	ID        uint      `json:"id"`
 	Username  string    `json:"username"`

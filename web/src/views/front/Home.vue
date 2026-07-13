@@ -1,8 +1,7 @@
 <template>
   <div class="home">
-    <div class="banner">
+    <div v-if="!aboutOpen" class="banner">
       <div class="banner-content">
-        <h1 class="banner-title">Gin Blog</h1>
         <p class="banner-subtitle">记录技术与生活，沉淀经验，也分享正在发生的思考。</p>
         <router-link to="/archive" class="btn btn-primary">浏览文章</router-link>
       </div>
@@ -153,8 +152,8 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getLatestArticles } from '../../api/article'
 import { getCategories } from '../../api/category'
 import { getTags } from '../../api/tag'
@@ -163,11 +162,12 @@ import { useUserStore } from '../../stores/user'
 import About from './About.vue'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const articles = ref([])
 const categories = ref([])
 const tags = ref([])
-const aboutOpen = ref(false)
+const aboutOpen = computed(() => route.query.panel === 'about')
 const siteStats = ref({
   articleCount: 0,
   categoryCount: 0,
@@ -232,7 +232,13 @@ function goToTag(tagId) {
 }
 
 function toggleAbout() {
-  aboutOpen.value = !aboutOpen.value
+  const query = { ...route.query }
+  if (aboutOpen.value) {
+    delete query.panel
+  } else {
+    query.panel = 'about'
+  }
+  router.push({ name: 'Home', query })
 }
 
 onMounted(async () => {
@@ -271,15 +277,6 @@ onMounted(async () => {
   position: relative;
   text-align: center;
   z-index: 1;
-}
-
-.banner-title {
-  font-size: 48px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  background: linear-gradient(135deg, var(--accent), #fff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .banner-subtitle {
@@ -325,17 +322,8 @@ onMounted(async () => {
   padding: 30px;
 }
 
-.about-inline-card :deep(.about-title) {
-  font-size: clamp(30px, 4vw, 46px);
-}
-
-.about-inline-card :deep(.about-lead),
 .about-inline-card :deep(.about-section-lead) {
   font-size: 17px;
-}
-
-.about-inline-card :deep(.about-list) {
-  font-size: 16px;
 }
 
 .about-inline-card :deep(.about-section) {
@@ -638,10 +626,6 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .banner {
     height: 200px;
-  }
-
-  .banner-title {
-    font-size: 32px;
   }
 
   .banner-subtitle {

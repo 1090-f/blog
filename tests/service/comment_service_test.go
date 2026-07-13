@@ -86,6 +86,83 @@ func TestCreateCommentTrimsContent(t *testing.T) {
 	}
 }
 
+func TestCreateGuestComment(t *testing.T) {
+	var created *model.Comment
+	svc := service.NewCommentService(
+		&fakeCommentStore{
+			createFn: func(comment *model.Comment) error {
+				created = comment
+				comment.ID = 1
+				return nil
+			},
+			findByIDFn: func(id uint) (*model.Comment, error) {
+				return &model.Comment{ID: id, GuestName: created.GuestName}, nil
+			},
+		},
+		&fakeArticleStore{
+			findPubByIDFn: func(id uint) (*model.Article, error) {
+				return &model.Article{ID: id}, nil
+			},
+		},
+	)
+
+	_, err := svc.Create(dto.CreateCommentRequest{
+		ArticleID:    1,
+		Content:      "hello",
+		GuestName:    "visitor",
+		GuestEmail:   "visitor@example.com",
+		GuestWebsite: "https://example.com",
+	}, 0)
+	if err != nil {
+		t.Fatalf("expected guest comment success, got %v", err)
+	}
+	if created.UserID != nil || created.GuestName != "visitor" || created.GuestEmail != "visitor@example.com" {
+		t.Fatalf("unexpected guest comment: %+v", created)
+	}
+}
+
+func TestCreateGuestCommentRejectsInvalidEmailAndWebsite(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		url   string
+		want  error
+	}{
+		{name: "invalid email", email: "visitor@", url: "https://example.com", want: service.ErrInvalidGuestEmail},
+		{name: "unsupported website scheme", email: "visitor@example.com", url: "javascript:alert(1)", want: service.ErrInvalidGuestWebsite},
+		{name: "website without host", email: "visitor@example.com", url: "https:", want: service.ErrInvalidGuestWebsite},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := service.NewCommentService(
+				&fakeCommentStore{
+					createFn: func(comment *model.Comment) error { return nil },
+					findByIDFn: func(id uint) (*model.Comment, error) {
+						return &model.Comment{ID: id}, nil
+					},
+				},
+				&fakeArticleStore{
+					findPubByIDFn: func(id uint) (*model.Article, error) {
+						return &model.Article{ID: id}, nil
+					},
+				},
+			)
+
+			_, err := svc.Create(dto.CreateCommentRequest{
+				ArticleID:    1,
+				Content:      "hello",
+				GuestName:    "visitor",
+				GuestEmail:   tt.email,
+				GuestWebsite: tt.url,
+			}, 0)
+			if err != tt.want {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
 func TestCreateReplyCommentUsesRootParentForSecondLevel(t *testing.T) {
 	var created *model.Comment
 	rootID := uint(10)
@@ -137,12 +214,13 @@ func TestCreateReplyCommentUsesRootParentForSecondLevel(t *testing.T) {
 
 func TestCreateCommentRejectsReplyToSelf(t *testing.T) {
 	replyID := uint(11)
+	userID := uint(3)
 
 	svc := service.NewCommentService(
 		&fakeCommentStore{
 			createFn: func(comment *model.Comment) error { return nil },
 			findByIDFn: func(id uint) (*model.Comment, error) {
-				return &model.Comment{ID: replyID, ArticleID: 1, UserID: 3, Status: 1}, nil
+				return &model.Comment{ID: replyID, ArticleID: 1, UserID: &userID, Status: 1}, nil
 			},
 		},
 		&fakeArticleStore{

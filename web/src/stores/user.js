@@ -23,14 +23,6 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('user', JSON.stringify(u))
   }
 
-  function updateUserProfile(nextUser) {
-    if (!nextUser) {
-      return
-    }
-    user.value = nextUser
-    localStorage.setItem('user', JSON.stringify(nextUser))
-  }
-
   function logout() {
     token.value = ''
     user.value = null
@@ -38,5 +30,5 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('user')
   }
 
-  return { token, user, isLoggedIn, isAdmin, setAuth, updateUserProfile, logout }
+  return { token, user, isLoggedIn, isAdmin, setAuth, logout }
 })

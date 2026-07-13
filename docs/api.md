@@ -111,6 +111,28 @@ Does not increase `viewCount`.
 
 List public comments for one published article.
 
+### POST `/api/comments`
+
+Create a comment for a published article. Authentication is optional:
+
+- when a valid JWT is supplied, the comment is associated with the current user
+- without a JWT, `guestName` and `guestEmail` are required; `guestWebsite` is optional and must use `http` or `https`
+
+Guest request example:
+
+```json
+{
+  "articleId": 1,
+  "replyToId": 2,
+  "content": "Nice article",
+  "guestName": "Alice",
+  "guestEmail": "alice@example.com",
+  "guestWebsite": "https://example.com"
+}
+```
+
+`replyToId` is optional. Guest email addresses are used only for comment records and are not returned by public comment APIs.
+
 ## Auth APIs
 
 ### POST `/api/auth/register`
@@ -160,42 +182,13 @@ Response:
 }
 ```
 
-### GET `/api/user/profile`
+### GET `/api/user/session`
 
-Get current authenticated user profile.
-
-### PUT `/api/user/profile`
-
-Update the current user's profile.
-
-Request:
-
-```json
-{
-  "nickname": "Alice",
-  "avatar": "/uploads/avatars/alice.png"
-}
-```
+Get the current authenticated user session information.
 
 ## Logged-In User APIs
 
 These APIs require authentication but do not require admin role.
-
-### POST `/api/comments`
-
-Create a comment for a published article.
-
-Request:
-
-```json
-{
-  "articleId": 1,
-  "replyToId": 2,
-  "content": "Nice article"
-}
-```
-
-`replyToId` is optional.
 
 ### DELETE `/api/comments/:id`
 

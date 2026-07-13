@@ -12,7 +12,7 @@ func registerHealthRoute(engine *gin.Engine, healthController *controller.Health
 	engine.GET("/health", healthController.Check)
 }
 
-func registerPublicRoutes(api *gin.RouterGroup, categoryController *controller.CategoryController, tagController *controller.TagController, articleController *controller.ArticleController, commentController *controller.CommentController, siteStatsController *controller.SiteStatsController, activityController *controller.ActivityController) {
+func registerPublicRoutes(api *gin.RouterGroup, cfg config.Config, categoryController *controller.CategoryController, tagController *controller.TagController, articleController *controller.ArticleController, commentController *controller.CommentController, siteStatsController *controller.SiteStatsController, activityController *controller.ActivityController, userReader middleware.UserReader) {
 	api.GET("/categories", categoryController.List)
 	api.GET("/tags", tagController.List)
 	api.GET("/site-stats", siteStatsController.Get)
@@ -23,6 +23,7 @@ func registerPublicRoutes(api *gin.RouterGroup, categoryController *controller.C
 	api.GET("/articles/:id", articleController.Detail)
 	api.GET("/articles/:id/full", articleController.FullDetail)
 	api.GET("/articles/:id/comments", commentController.ListByArticle)
+	api.POST("/comments", middleware.OptionalAuth(cfg.JWT.Secret, userReader), commentController.Create)
 }
 
 func registerAuthRoutes(api *gin.RouterGroup, authController *controller.AuthController) {
@@ -31,15 +32,13 @@ func registerAuthRoutes(api *gin.RouterGroup, authController *controller.AuthCon
 	authGroup.POST("/login", authController.Login)
 }
 
-func registerUserRoutes(api *gin.RouterGroup, cfg config.Config, authController *controller.AuthController, userController *controller.UserController, categoryController *controller.CategoryController, articleController *controller.ArticleController, commentController *controller.CommentController, uploadController *controller.UploadController, userReader middleware.UserReader) {
+func registerUserRoutes(api *gin.RouterGroup, cfg config.Config, authController *controller.AuthController, categoryController *controller.CategoryController, articleController *controller.ArticleController, commentController *controller.CommentController, uploadController *controller.UploadController, userReader middleware.UserReader) {
 	userGroup := api.Group("/user")
 	userGroup.Use(middleware.Auth(cfg.JWT.Secret, userReader))
-	userGroup.GET("/profile", authController.Profile)
-	userGroup.PUT("/profile", userController.UpdateProfile)
+	userGroup.GET("/session", authController.Session)
 
 	authenticatedGroup := api.Group("")
 	authenticatedGroup.Use(middleware.Auth(cfg.JWT.Secret, userReader))
-	authenticatedGroup.POST("/comments", commentController.Create)
 	authenticatedGroup.DELETE("/comments/:id", commentController.DeleteMine)
 	authenticatedGroup.POST("/articles", articleController.Create)
 	authenticatedGroup.POST("/categories", categoryController.Create)

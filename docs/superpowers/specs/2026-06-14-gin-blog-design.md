@@ -151,7 +151,7 @@
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
-- `GET /api/user/profile`
+- `GET /api/user/session`
 
 ### 6.4 登录态接口
 

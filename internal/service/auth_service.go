@@ -120,7 +120,7 @@ func (s *AuthService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 	}, nil
 }
 
-func (s *AuthService) Profile(userID uint) (*model.User, error) {
+func (s *AuthService) CurrentUser(userID uint) (*model.User, error) {
 	user, err := s.userDAO.FindByID(userID)
 	if err != nil {
 		return nil, err

@@ -60,10 +60,6 @@
               </button>
 
               <div class="user-dropdown">
-                <button type="button" class="user-dropdown-item subnav-link" @click="goProfile">
-                  <span class="subnav-icon">◎</span>
-                  个人中心
-                </button>
                 <button type="button" class="user-dropdown-item subnav-link" @click="handleLogout">
                   <span class="subnav-icon">↪</span>
                   退出登录
@@ -86,7 +82,6 @@
       <router-link to="/archive" @click="mobileOpen = false">📝 文章归档</router-link>
 
       <template v-if="userStore.isLoggedIn">
-        <router-link to="/profile" @click="mobileOpen = false">👤 个人中心</router-link>
         <a @click="handleLogout">🚪 退出登录</a>
       </template>
 
@@ -102,10 +97,17 @@
             <div class="card author-card">
               <button class="author-profile-trigger" type="button" aria-label="查看关于我" @click="goAbout">
                 <img src="/author-profile.png?v=2" :alt="`${authorName} avatar`" class="author-avatar-image" />
+                <span class="author-avatar-hover" aria-hidden="true">
+                  <svg viewBox="0 0 48 48">
+                    <rect x="5" y="8" width="38" height="32" rx="5" />
+                    <circle cx="17" cy="20" r="4" />
+                    <path d="M11 33c1.8-5.3 10.2-5.3 12 0M29 18h8M29 25h8M29 32h5" />
+                  </svg>
+                </span>
               </button>
               <h3 class="author-name">{{ authorName }}</h3>
               <span class="author-accent" aria-hidden="true"></span>
-              <p class="author-description">七月初七，淮水竹亭</p>
+              <p class="author-description">Hello，欢迎来到我的博客！</p>
               <nav class="author-links" aria-label="个人链接">
                 <a href="tencent://AddContact/?fromId=45&fromSubId=1&subcmd=all&uin=1438318243&website=www.oicqzone.com" aria-label="添加 QQ 好友" title="QQ：1438318243">
                   <svg class="author-social-icon qq-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -121,9 +123,12 @@
             <div class="card sidebar-meta-card">
               <h4 class="sidebar-card-title">分类</h4>
               <div class="sidebar-tags">
-                <button v-for="category in categories" :key="category.id" type="button" @click="goToCategory(category.id)">
+                <button v-for="category in visibleCategories" :key="category.id" type="button" @click="goToCategory(category.id)">
                   <span>{{ category.name }}</span>
                   <span class="sidebar-tag-count">{{ category.articleCount || 0 }}</span>
+                </button>
+                <button v-if="categories.length > visibleCategories.length" type="button" class="sidebar-more" @click="router.push('/categories')">
+                  更多 <span aria-hidden="true">›</span>
                 </button>
               </div>
             </div>
@@ -131,7 +136,10 @@
             <div class="card sidebar-meta-card">
               <h4 class="sidebar-card-title">标签</h4>
               <div class="sidebar-tags">
-                <button v-for="tag in tags" :key="tag.id" type="button" @click="goToTag(tag.id)">{{ tag.name }}</button>
+                <button v-for="tag in visibleTags" :key="tag.id" type="button" @click="goToTag(tag.id)">{{ tag.name }}</button>
+                <button v-if="tags.length > visibleTags.length" type="button" class="sidebar-more" @click="router.push('/tags')">
+                  更多 <span aria-hidden="true">›</span>
+                </button>
               </div>
             </div>
           </aside>
@@ -213,14 +221,10 @@ const siteStats = ref({
   firstPublishedAt: null,
   lastActivityAt: null
 })
-const authorName = computed(() => userStore.user?.nickname || '管理员')
+const authorName = '冬'
 const showArchiveToolbar = computed(() => ['Home', 'Archive', 'Article', 'Categories', 'Tags'].includes(route.name))
-
-function goProfile() {
-  mobileOpen.value = false
-  userMenuOpen.value = false
-  router.push('/profile')
-}
+const visibleCategories = computed(() => categories.value.slice(0, 6))
+const visibleTags = computed(() => tags.value.slice(0, 8))
 
 function handleLogout() {
   mobileOpen.value = false
@@ -230,7 +234,7 @@ function handleLogout() {
 }
 
 function goAbout() {
-  router.push('/about')
+  router.push({ name: 'Home', query: { panel: 'about' } })
 }
 
 function handleArticleMenuFocusOut(event) {
@@ -692,6 +696,7 @@ onMounted(async () => {
 }
 
 .author-profile-trigger {
+  position: relative;
   display: block;
   width: 100%;
   padding: 0;
@@ -713,6 +718,34 @@ onMounted(async () => {
 
 .author-profile-trigger:hover .author-avatar-image {
   transform: scale(1.03);
+  filter: brightness(0.62);
+}
+
+.author-avatar-hover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.25s ease, background 0.25s ease;
+}
+
+.author-avatar-hover svg {
+  width: 58px;
+  height: 58px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.author-profile-trigger:hover .author-avatar-hover,
+.author-profile-trigger:focus-visible .author-avatar-hover {
+  opacity: 1;
+  background: rgba(15, 20, 25, 0.2);
 }
 
 .author-name {
@@ -847,6 +880,23 @@ onMounted(async () => {
 .sidebar-tags button:hover {
   background: var(--accent);
   color: var(--bg-primary);
+}
+
+.sidebar-tags .sidebar-more {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.sidebar-tags .sidebar-more:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.sidebar-more span {
+  font-size: 18px;
+  line-height: 0;
 }
 
 .front-footer {

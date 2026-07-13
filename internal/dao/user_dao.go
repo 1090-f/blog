@@ -72,13 +72,6 @@ func (d *UserDAO) UpdateStatus(id uint, status int8) error {
 	return d.db.Model(&model.User{}).Where("id = ?", id).Update("status", status).Error
 }
 
-func (d *UserDAO) UpdateProfile(id uint, nickname, avatar string) error {
-	return d.db.Model(&model.User{}).Where("id = ?", id).Updates(map[string]any{
-		"nickname": nickname,
-		"avatar":   avatar,
-	}).Error
-}
-
 func (d *UserDAO) CountAll() (int64, error) {
 	var count int64
 	if err := d.db.Model(&model.User{}).Count(&count).Error; err != nil {

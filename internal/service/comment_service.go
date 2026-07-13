@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"net/mail"
+	"net/url"
 	"strings"
 
 	"blog/internal/dao"
@@ -16,6 +18,10 @@ var (
 	ErrCommentNotFound      = errors.New("comment not found")
 	ErrCommentForbidden     = errors.New("comment ownership required")
 	ErrInvalidComment       = errors.New("invalid comment params")
+	ErrGuestNameRequired    = errors.New("guest name is required")
+	ErrGuestEmailRequired   = errors.New("guest email is required")
+	ErrInvalidGuestEmail    = errors.New("guest email is invalid")
+	ErrInvalidGuestWebsite  = errors.New("guest website must use http or https")
 	ErrInvalidCommentStatus = errors.New("invalid comment status")
 )
 
@@ -59,10 +65,6 @@ func (s *CommentService) ListPublicByArticleID(articleID uint) ([]model.Comment,
 }
 
 func (s *CommentService) Create(req dto.CreateCommentRequest, userID uint) (*model.Comment, error) {
-	if userID == 0 {
-		return nil, ErrInvalidComment
-	}
-
 	if _, err := s.articleDAO.FindPublishedByID(req.ArticleID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrArticleNotFound
@@ -73,6 +75,23 @@ func (s *CommentService) Create(req dto.CreateCommentRequest, userID uint) (*mod
 	content := strings.TrimSpace(req.Content)
 	if req.ArticleID == 0 || content == "" || len(content) > 500 {
 		return nil, ErrInvalidComment
+	}
+	guestName := strings.TrimSpace(req.GuestName)
+	guestEmail := strings.TrimSpace(req.GuestEmail)
+	guestWebsite := strings.TrimSpace(req.GuestWebsite)
+	if userID == 0 {
+		if guestName == "" || len(guestName) > 50 {
+			return nil, ErrGuestNameRequired
+		}
+		if guestEmail == "" {
+			return nil, ErrGuestEmailRequired
+		}
+		if !isValidGuestEmail(guestEmail) {
+			return nil, ErrInvalidGuestEmail
+		}
+		if !isValidGuestWebsite(guestWebsite) {
+			return nil, ErrInvalidGuestWebsite
+		}
 	}
 
 	var parentID *uint
@@ -87,7 +106,7 @@ func (s *CommentService) Create(req dto.CreateCommentRequest, userID uint) (*mod
 		if replyTo.ArticleID != req.ArticleID || replyTo.Status != 1 {
 			return nil, ErrInvalidComment
 		}
-		if replyTo.UserID == userID {
+		if userID != 0 && replyTo.UserID != nil && *replyTo.UserID == userID {
 			return nil, ErrInvalidComment
 		}
 
@@ -100,17 +119,47 @@ func (s *CommentService) Create(req dto.CreateCommentRequest, userID uint) (*mod
 
 	comment := &model.Comment{
 		ArticleID: req.ArticleID,
-		UserID:    userID,
 		ParentID:  parentID,
 		ReplyToID: req.ReplyToID,
 		Content:   content,
 		Status:    1,
+	}
+	if userID != 0 {
+		comment.UserID = &userID
+	} else {
+		comment.GuestName = guestName
+		comment.GuestEmail = guestEmail
+		comment.GuestWebsite = guestWebsite
 	}
 	if err := s.commentDAO.Create(comment); err != nil {
 		return nil, err
 	}
 
 	return s.commentDAO.FindByID(comment.ID)
+}
+
+func isValidGuestEmail(email string) bool {
+	if len(email) > 255 {
+		return false
+	}
+	address, err := mail.ParseAddress(email)
+	return err == nil && address.Address == email
+}
+
+func isValidGuestWebsite(website string) bool {
+	if website == "" {
+		return true
+	}
+	if len(website) > 255 {
+		return false
+	}
+
+	parsed, err := url.Parse(website)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	return scheme == "http" || scheme == "https"
 }
 
 func (s *CommentService) DeleteByUser(id, userID uint) error {
@@ -125,7 +174,7 @@ func (s *CommentService) DeleteByUser(id, userID uint) error {
 		}
 		return err
 	}
-	if comment.UserID != userID {
+	if comment.UserID == nil || *comment.UserID != userID {
 		return ErrCommentForbidden
 	}
 

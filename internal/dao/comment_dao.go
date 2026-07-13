@@ -92,7 +92,7 @@ func (d *CommentDAO) baseQuery() *gorm.DB {
 
 func (d *CommentDAO) adminQuery() *gorm.DB {
 	return d.baseQuery().
-		Joins("JOIN users ON users.id = comments.user_id").
+		Joins("LEFT JOIN users ON users.id = comments.user_id").
 		Joins("JOIN articles ON articles.id = comments.article_id")
 }
 
@@ -106,8 +106,8 @@ func applyCommentFilters(query *gorm.DB, filter CommentListFilter) *gorm.DB {
 	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
 		query = query.Where(
-			"(comments.content LIKE ? OR users.username LIKE ? OR users.nickname LIKE ? OR articles.title LIKE ?)",
-			like, like, like, like,
+			"(comments.content LIKE ? OR comments.guest_name LIKE ? OR comments.guest_email LIKE ? OR users.username LIKE ? OR users.nickname LIKE ? OR articles.title LIKE ?)",
+			like, like, like, like, like, like,
 		)
 	}
 	return query

@@ -15,14 +15,12 @@ import (
 var (
 	ErrUserNotFound      = errors.New("user not found")
 	ErrInvalidUserStatus = errors.New("invalid user status")
-	ErrInvalidProfile    = errors.New("invalid profile")
 )
 
 type UserAdminStore interface {
 	List(filter dao.UserListFilter) ([]model.User, int64, error)
 	FindByID(id uint) (*model.User, error)
 	UpdateStatus(id uint, status int8) error
-	UpdateProfile(id uint, nickname, avatar string) error
 }
 
 type UserService struct {
@@ -68,28 +66,4 @@ func (s *UserService) UpdateStatus(id uint, req dto.UpdateUserStatusRequest) (*m
 		return nil, err
 	}
 	return s.userStore.FindByID(id)
-}
-
-func (s *UserService) UpdateProfile(userID uint, req dto.UpdateProfileRequest) (*model.User, error) {
-	if userID == 0 {
-		return nil, ErrUserNotFound
-	}
-
-	nickname := strings.TrimSpace(req.Nickname)
-	avatar := strings.TrimSpace(req.Avatar)
-	if len(nickname) < 2 || len(nickname) > 50 || len(avatar) > 255 {
-		return nil, ErrInvalidProfile
-	}
-
-	if _, err := s.userStore.FindByID(userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-
-	if err := s.userStore.UpdateProfile(userID, nickname, avatar); err != nil {
-		return nil, err
-	}
-	return s.userStore.FindByID(userID)
 }

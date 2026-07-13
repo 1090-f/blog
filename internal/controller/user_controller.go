@@ -69,35 +69,6 @@ func (ctl *UserController) UpdateStatus(c *gin.Context) {
 	response.Success(c, toAdminUserResponse(*user))
 }
 
-func (ctl *UserController) UpdateProfile(c *gin.Context) {
-	userID := c.GetUint("userID")
-	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, 4010, "unauthorized")
-		return
-	}
-
-	var req dto.UpdateProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 4001, "invalid request params")
-		return
-	}
-
-	user, err := ctl.userService.UpdateProfile(userID, req)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrUserNotFound):
-			response.Error(c, http.StatusNotFound, 4041, err.Error())
-		case errors.Is(err, service.ErrInvalidProfile):
-			response.Error(c, http.StatusBadRequest, 4007, err.Error())
-		default:
-			response.Error(c, http.StatusInternalServerError, 5024, "failed to update profile")
-		}
-		return
-	}
-
-	response.Success(c, user)
-}
-
 func toAdminUserResponses(users []model.User) []dto.AdminUserResponse {
 	resp := make([]dto.AdminUserResponse, 0, len(users))
 	for _, user := range users {

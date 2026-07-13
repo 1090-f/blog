@@ -97,13 +97,20 @@ func toAdminCommentResponses(comments []model.Comment) []dto.AdminCommentRespons
 }
 
 func toAdminCommentResponse(comment model.Comment) dto.AdminCommentResponse {
+	username := ""
+	nickname := comment.GuestName
+	if comment.User != nil {
+		username = comment.User.Username
+		nickname = comment.User.Nickname
+	}
+
 	return dto.AdminCommentResponse{
 		ID:           comment.ID,
 		ArticleID:    comment.ArticleID,
 		ArticleTitle: comment.Article.Title,
 		UserID:       comment.UserID,
-		Username:     comment.User.Username,
-		Nickname:     comment.User.Nickname,
+		Username:     username,
+		Nickname:     nickname,
 		ParentID:     comment.ParentID,
 		ReplyToID:    comment.ReplyToID,
 		Content:      comment.Content,

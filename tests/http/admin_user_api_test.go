@@ -45,16 +45,6 @@ func (f *fakeAdminHTTPUserStore) UpdateStatus(id uint, status int8) error {
 	return nil
 }
 
-func (f *fakeAdminHTTPUserStore) UpdateProfile(id uint, nickname, avatar string) error {
-	user, ok := f.users[id]
-	if !ok {
-		return gorm.ErrRecordNotFound
-	}
-	user.Nickname = nickname
-	user.Avatar = avatar
-	return nil
-}
-
 func adminAuthToken(t *testing.T, userID uint, role string) string {
 	t.Helper()
 	token, err := jwtpkg.GenerateToken("secret", userID, role, 7200)

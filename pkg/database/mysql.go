@@ -70,7 +70,39 @@ func MustOpen(cfg config.DatabaseConfig) *gorm.DB {
 	}
 
 	log.Println("[init] 数据表已同步")
+	if err := ensureGuestCommentSchema(db); err != nil {
+		panic(err)
+	}
+
 	return db
+}
+
+// ensureGuestCommentSchema makes user_id nullable for databases created before
+// anonymous comments were supported. AutoMigrate does not always relax an
+// existing NOT NULL constraint, so only those legacy schemas need a DDL change.
+func ensureGuestCommentSchema(db *gorm.DB) error {
+	columns, err := db.Migrator().ColumnTypes(&model.Comment{})
+	if err != nil {
+		return err
+	}
+
+	for _, column := range columns {
+		if column.Name() != "user_id" {
+			continue
+		}
+
+		nullable, ok := column.Nullable()
+		if !ok {
+			return fmt.Errorf("could not determine whether comments.user_id is nullable")
+		}
+		if nullable {
+			return nil
+		}
+
+		return db.Exec("ALTER TABLE comments MODIFY COLUMN user_id BIGINT UNSIGNED NULL").Error
+	}
+
+	return fmt.Errorf("comments.user_id column not found")
 }
 
 func EnsureAdmin(db *gorm.DB, cfg config.AdminBootstrapConfig) error {

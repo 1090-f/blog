@@ -27,7 +27,36 @@
             <span class="section-tip">支持二级评论</span>
           </div>
 
-          <div v-if="userStore.isLoggedIn" class="comment-form root-comment-form">
+          <div class="comment-form root-comment-form">
+            <div class="comment-form-fields" :class="{ 'is-authenticated': userStore.isLoggedIn }">
+              <div class="comment-form-avatar" aria-hidden="true">
+                {{ (userStore.isLoggedIn ? userStore.user?.nickname : guestName)?.[0] || '?' }}
+              </div>
+              <template v-if="userStore.isLoggedIn">
+                <div class="comment-form-identity">
+                  <span class="comment-form-identity-name">{{ userStore.user?.nickname || userStore.user?.username }}</span>
+                  <span class="comment-form-identity-status">已登录，将以账户身份发表评论</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="comment-form-field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" /></svg>
+                  <input v-model="guestName" type="text" maxlength="50" placeholder="昵称" />
+                </div>
+                <div class="comment-form-field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                  <input v-model="guestEmail" type="email" maxlength="255" placeholder="邮箱" />
+                </div>
+                <div class="comment-form-field comment-website-field">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z" /></svg>
+                  <input v-model="guestWebsite" type="url" maxlength="255" placeholder="网站（可选）" />
+                </div>
+              </template>
+            </div>
+            <div v-if="replyTarget && !userStore.isLoggedIn" class="root-reply-banner">
+              正在回复 {{ replyTarget.author?.nickname || '匿名用户' }}
+              <button type="button" class="reply-cancel" @click="clearReply">取消</button>
+            </div>
             <textarea
               v-model="rootCommentContent"
               class="input comment-input"
@@ -42,11 +71,6 @@
               {{ submitting && !replyTarget ? '提交中...' : '发表评论' }}
             </button>
           </div>
-          <div v-else class="login-hint">
-            <router-link :to="{ name: 'Login', query: { redirect: $route.fullPath } }">登录</router-link>
-            后即可发表评论和回复。
-          </div>
-
           <div v-if="commentsLoading" class="loading-state">评论加载中...</div>
           <div v-else class="comment-list">
             <div v-for="comment in commentTree" :key="comment.id" class="comment-thread">
@@ -187,6 +211,9 @@ const userStore = useUserStore()
 const article = ref(null)
 const comments = ref([])
 const rootCommentContent = ref('')
+const guestName = ref('')
+const guestEmail = ref('')
+const guestWebsite = ref('')
 const replyContent = ref('')
 const submitting = ref(false)
 const pageLoading = ref(false)
@@ -268,7 +295,7 @@ function formatDate(dateStr) {
 }
 
 function canReply(comment) {
-  return userStore.isLoggedIn && comment.userId !== userStore.user?.id
+  return !userStore.isLoggedIn || comment.userId !== userStore.user?.id
 }
 
 function canDelete(comment) {
@@ -325,6 +352,9 @@ async function initializePage() {
   article.value = null
   comments.value = []
   rootCommentContent.value = ''
+  guestName.value = ''
+  guestEmail.value = ''
+  guestWebsite.value = ''
   replyContent.value = ''
   replyTarget.value = null
 
@@ -340,8 +370,24 @@ async function initializePage() {
 }
 
 async function submitComment(targetComment = null) {
-  const isReply = !!targetComment
-  const content = isReply ? replyContent.value.trim() : rootCommentContent.value.trim()
+  const replyComment = targetComment || replyTarget.value
+  const isInlineReply = !!targetComment
+  const content = isInlineReply ? replyContent.value.trim() : rootCommentContent.value.trim()
+
+  if (!userStore.isLoggedIn) {
+    if (!guestName.value.trim()) {
+      message.warning('请填写昵称')
+      return
+    }
+    if (!guestEmail.value.trim()) {
+      message.warning('请填写邮箱')
+      return
+    }
+    if (!/^\S+@\S+\.\S+$/.test(guestEmail.value.trim())) {
+      message.warning('请输入正确的邮箱地址，例如 name@example.com')
+      return
+    }
+  }
   if (!content) {
     message.warning('请输入评论内容')
     return
@@ -351,15 +397,19 @@ async function submitComment(targetComment = null) {
   try {
     await createComment({
       articleId: Number(route.params.id),
-      replyToId: targetComment?.id,
-      content
+      replyToId: replyComment?.id,
+      content,
+      guestName: userStore.isLoggedIn ? undefined : guestName.value.trim(),
+      guestEmail: userStore.isLoggedIn ? undefined : guestEmail.value.trim(),
+      guestWebsite: userStore.isLoggedIn ? undefined : guestWebsite.value.trim()
     })
 
-    if (isReply) {
+    if (isInlineReply) {
       replyContent.value = ''
       clearReply()
     } else {
       rootCommentContent.value = ''
+      clearReply()
     }
 
     message.success('评论发布成功')
@@ -499,7 +549,157 @@ watch(
 }
 
 .root-comment-form {
-  padding-bottom: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  margin-bottom: 28px;
+  overflow: hidden;
+  border: 1px solid var(--accent);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.05);
+}
+
+.comment-form-fields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 96px repeat(3, minmax(0, 1fr));
+  min-height: 84px;
+  align-items: center;
+  border-bottom: 1px dashed var(--border-light);
+}
+
+.comment-form-fields.is-authenticated {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.comment-form-avatar {
+  width: 52px;
+  height: 52px;
+  margin-left: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.comment-form-field {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 38px;
+  padding: 0 24px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  border-left: 1px dashed var(--border-light);
+}
+
+.comment-form-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 24px;
+  border-left: 1px dashed var(--border-light);
+}
+
+.comment-form-identity-name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-form-identity-status {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.comment-form-field svg,
+.root-comment-form .btn svg {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.comment-form-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+}
+
+.comment-form-field input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.comment-form-field input:focus {
+  color: var(--text-primary);
+}
+
+.comment-form-field span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.root-comment-form .comment-input {
+  grid-column: 1 / -1;
+  min-height: 190px;
+  padding: 26px 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.root-reply-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px dashed var(--border-light);
+  background: rgba(45, 212, 191, 0.08);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.root-comment-form .comment-input:focus {
+  box-shadow: none;
+}
+
+.root-comment-form .btn {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  margin: 0 20px 14px 0;
+  padding: 11px 20px;
+  border-radius: 13px;
+}
+
+.root-comment-form .btn::before {
+  content: '↗';
+  font-size: 19px;
+  line-height: 1;
 }
 
 .inline-reply-form {
@@ -556,16 +756,6 @@ watch(
 .comment-form .btn:disabled {
   cursor: not-allowed;
   opacity: 0.6;
-}
-
-.login-hint {
-  margin-bottom: 24px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.login-hint a {
-  color: var(--accent);
 }
 
 .comment-list {
@@ -671,6 +861,38 @@ watch(
   .reply-list {
     margin-left: 20px;
     padding-left: 12px;
+  }
+
+  .comment-form-fields {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .comment-form-fields.is-authenticated {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .comment-form-avatar {
+    width: 40px;
+    height: 40px;
+    margin-left: 12px;
+    font-size: 16px;
+  }
+
+  .comment-form-field {
+    padding: 0 14px;
+  }
+
+  .comment-form-identity {
+    padding: 0 14px;
+  }
+
+  .comment-form-field:nth-child(n + 3) {
+    display: none;
+  }
+
+  .root-comment-form .comment-input {
+    min-height: 150px;
+    padding: 20px;
   }
 }
 </style>

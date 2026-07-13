@@ -1,30 +1,5 @@
 <template>
   <div class="about-page">
-    <section class="about-intro">
-      <h1 class="about-title">{{ copy.title }}</h1>
-      <p class="about-lead">
-        {{ copy.greeting }} <strong>{{ authorName }}</strong>，{{ copy.lead }}
-      </p>
-
-      <ul class="about-list">
-        <li>
-          <span class="about-bullet" aria-hidden="true"></span>
-          <span>{{ copy.todo }}</span>
-          <a href="https://bangumi.tv/" target="_blank" rel="noreferrer">bangumi 番组计划</a>
-        </li>
-        <li>
-          <span class="about-bullet" aria-hidden="true"></span>
-          <span>{{ copy.tools }}</span>
-        </li>
-      </ul>
-
-      <div class="tool-grid" aria-label="常用工具">
-        <div v-for="tool in tools" :key="tool.name" class="tool-item" :class="`tool-${tool.theme}`" :title="tool.name">
-          <span>{{ tool.mark }}</span>
-        </div>
-      </div>
-    </section>
-
     <section class="about-section">
       <h2>{{ copy.siteTitle }}</h2>
       <p class="about-section-lead">
@@ -44,12 +19,15 @@
           </a>
         </div>
         <p class="project-description">{{ copy.projectDescription }}</p>
-        <div class="project-meta">
-          <span>☆ 1.6K</span>
-          <span>⌘ 1.1K</span>
-          <span>⚖ MIT</span>
-        </div>
       </article>
+
+      <div class="site-details">
+        <article v-for="item in siteHighlights" :key="item.title" class="site-detail-card">
+          <span class="site-detail-icon" aria-hidden="true">{{ item.icon }}</span>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
     </section>
 
     <section class="about-section contact-section">
@@ -60,22 +38,13 @@
           {{ link.label }}
         </a>
       </div>
+      <p class="contact-note">添加好友时请注明“博客来访”，方便确认你的留言。</p>
     </section>
   </div>
 </template>
 
 <script setup>
-import { useUserStore } from '../../stores/user'
-
-const userStore = useUserStore()
-const authorName = userStore.user?.nickname || 'Jason Shane'
-
 const copy = {
-  title: '\u5173\u4e8e\u6211 / About Me',
-  greeting: '\u4f60\u597d\uff01\u6211\u662f',
-  lead: '\u4e00\u4e2a\u4e8c\u6b21\u5143\u6280\u672f\u5b85\uff0c\u559c\u6b22\u63a2\u7d22\u65b0\u7684\u6280\u672f\u548c\u586b\u5145\u81ea\u5df1\u7684\u672a\u77e5\u57df\uff0c\u6311\u6218\u4e0d\u53ef\u77e5\u57df\u3002',
-  todo: '\u8ffd\u756a\u6e05\u5355\uff1a',
-  tools: '\u5e38\u7528\u5de5\u5177\uff1a',
   siteTitle: '\u5173\u4e8e\u672c\u7ad9',
   siteLead: '\u672c\u7ad9\u4f7f\u7528',
   projectDescription: '\u8bb0\u5f55\u6280\u672f\u3001\u751f\u6d3b\u548c\u6bcf\u4e00\u6b21\u601d\u8003\u3002\u8fd9\u91cc\u662f\u5c5e\u4e8e\u6211\u7684\u5b89\u9759\u89d2\u843d\u3002',
@@ -83,23 +52,30 @@ const copy = {
   contactLead: '\u5982\u679c\u4f60\u60f3\u548c\u6211\u4ea4\u6d41\u6280\u672f\u95ee\u9898\u3001\u5206\u4eab\u6709\u8da3\u7684\u60f3\u6cd5\uff0c\u6b22\u8fce\u901a\u8fc7\u4ee5\u4e0b\u65b9\u5f0f\u8054\u7cfb\u6211\u3002'
 }
 
-const tools = [
-  { name: 'Python', mark: 'Py', theme: 'python' },
-  { name: 'Markdown', mark: 'M↓', theme: 'markdown' },
-  { name: 'Git', mark: '◆', theme: 'git' },
-  { name: 'GitHub', mark: '●', theme: 'github' },
-  { name: 'Cloudflare', mark: '☁', theme: 'cloudflare' },
-  { name: 'Astro', mark: '✦', theme: 'astro' },
-  { name: 'VS Code', mark: '⌁', theme: 'vscode' },
-  { name: 'Blender', mark: '◎', theme: 'blender' },
-  { name: 'Notion', mark: 'N', theme: 'notion' },
-  { name: 'Obsidian', mark: '◈', theme: 'obsidian' }
+const contactLinks = [
+  {
+    label: 'QQ：1438318243',
+    href: 'tencent://AddContact/?fromId=45&fromSubId=1&subcmd=all&uin=1438318243&website=www.oicqzone.com',
+    external: false
+  }
 ]
 
-const contactLinks = [
-  { label: 'GitHub', href: 'https://github.com/', external: true },
-  { label: 'Bilibili', href: 'https://www.bilibili.com/', external: true },
-  { label: 'hello@ginblog.dev', href: 'mailto:hello@ginblog.dev', external: false }
+const siteHighlights = [
+  {
+    icon: '✦',
+    title: '内容方向',
+    description: '记录开发实践、工具使用与日常思考，也会整理值得回看的技术笔记。'
+  },
+  {
+    icon: '◌',
+    title: '写作原则',
+    description: '尽量写清背景、过程与结论；持续补充和修订，让每篇文章更有参考价值。'
+  },
+  {
+    icon: '↗',
+    title: '交流互动',
+    description: '欢迎在文章下留言讨论，也欢迎通过 QQ 分享建议、问题或有趣的想法。'
+  }
 ]
 </script>
 
@@ -135,11 +111,6 @@ const contactLinks = [
   transform: rotate(48deg) scale(0.7);
 }
 
-.about-intro {
-  padding: 0 0 34px;
-}
-
-.about-title,
 .about-section h2 {
   color: var(--text-primary);
   font-size: clamp(36px, 5vw, 56px);
@@ -147,11 +118,6 @@ const contactLinks = [
   letter-spacing: -0.04em;
 }
 
-.about-title {
-  margin-bottom: 42px;
-}
-
-.about-lead,
 .about-section-lead {
   max-width: 1100px;
   color: #c7cbd1;
@@ -159,84 +125,17 @@ const contactLinks = [
   line-height: 1.8;
 }
 
-.about-lead strong,
 .about-section-lead strong {
   color: #fff;
 }
 
-.about-list {
-  display: grid;
-  gap: 14px;
-  margin: 30px 0 22px;
-  padding: 0;
-  list-style: none;
-  color: #c7cbd1;
-  font-size: 21px;
-}
-
-.about-list li {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.about-bullet {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.about-list a,
 .contact-links a {
   color: var(--accent);
 }
 
-.about-list a:hover,
 .contact-links a:hover {
   color: #fff;
 }
-
-.tool-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  max-width: 850px;
-  margin: 46px auto 0;
-}
-
-.tool-item {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
-  background: #f3f3f0;
-  color: #20242a;
-  font-size: 23px;
-  font-weight: 800;
-  letter-spacing: -0.08em;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.tool-item:hover {
-  transform: translateY(-5px) rotate(-2deg);
-  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.25);
-}
-
-.tool-python { color: #e3b52d; text-shadow: 2px 2px #3979a8; }
-.tool-markdown { color: #161616; font-size: 21px; }
-.tool-git { color: #f04438; font-size: 35px; }
-.tool-github { color: #191919; font-size: 40px; }
-.tool-cloudflare { color: #f28b20; font-size: 38px; }
-.tool-astro { color: #4e83b7; font-size: 38px; }
-.tool-vscode { color: #1478bd; font-size: 42px; }
-.tool-blender { color: #e87900; font-size: 42px; }
-.tool-notion { color: #171717; border: 2px solid #1a1a1a; }
-.tool-obsidian { color: #8054de; font-size: 40px; }
 
 .about-section {
   margin-top: 70px;
@@ -257,7 +156,6 @@ const contactLinks = [
 
 .project-heading,
 .project-identity,
-.project-meta,
 .contact-links {
   display: flex;
   align-items: center;
@@ -307,10 +205,44 @@ const contactLinks = [
   line-height: 1.8;
 }
 
-.project-meta {
-  gap: 28px;
-  color: #c7cdd0;
-  font-size: 16px;
+.site-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.site-detail-card {
+  min-height: 190px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(17, 28, 43, 0.55);
+}
+
+.site-detail-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 18px;
+  border-radius: 10px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.site-detail-card h3 {
+  margin-bottom: 10px;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.site-detail-card p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.75;
 }
 
 .contact-section {
@@ -324,24 +256,15 @@ const contactLinks = [
   font-size: 18px;
 }
 
+.contact-note {
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
 @media (max-width: 768px) {
   .about-page {
     padding-top: 10px;
-  }
-
-  .about-title {
-    margin-bottom: 26px;
-  }
-
-  .about-list {
-    font-size: 17px;
-  }
-
-  .tool-item {
-    width: 58px;
-    height: 58px;
-    border-radius: 13px;
-    font-size: 18px;
   }
 
   .project-card {
@@ -357,10 +280,14 @@ const contactLinks = [
     font-size: 15px;
   }
 
-  .project-meta {
-    flex-wrap: wrap;
-    gap: 14px;
-    font-size: 14px;
+  .site-details {
+    grid-template-columns: 1fr;
   }
+
+  .site-detail-card {
+    min-height: 0;
+    padding: 20px;
+  }
+
 }
 </style>
