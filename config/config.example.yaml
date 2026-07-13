@@ -1,0 +1,27 @@
+server:
+  port: "8080"
+
+admin_server:
+  port: "8081"
+
+database:
+  host: "127.0.0.1"
+  port: 3306
+  user: "root"
+  pass: "replace-with-your-password"
+  name: "gin_blog"
+
+jwt:
+  secret: "replace-with-a-random-secret"
+  expire: 7200
+
+upload:
+  dir: "./uploads"
+  url: "/uploads"
+  max_size_bytes: 5242880
+
+admin_bootstrap:
+  enabled: false
+  username: ""
+  password: ""
+  nickname: ""

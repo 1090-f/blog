@@ -1,0 +1,47 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+web/.tmp/
+
+# Runtime data
+uploads/
+web/uploads/
+
+# Local caches
+.tmp/
+cache/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Local config overrides
+config/config.yaml
+config/config.local.yaml
+config/*.local.yaml
+.env
+.env.*
+web/.env.local
+web/.env.*.local

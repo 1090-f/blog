@@ -1,0 +1,50 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BLOG_DATABASE_HOST: db
+      BLOG_DATABASE_PORT: "3306"
+      BLOG_DATABASE_USER: ${MYSQL_USER}
+      BLOG_DATABASE_PASS: ${MYSQL_PASSWORD}
+      BLOG_DATABASE_NAME: ${MYSQL_DATABASE}
+      BLOG_JWT_SECRET: ${BLOG_JWT_SECRET}
+      BLOG_JWT_EXPIRE: ${BLOG_JWT_EXPIRE:-7200}
+      BLOG_UPLOAD_DIR: /app/uploads
+      BLOG_UPLOAD_URL: /uploads
+      BLOG_UPLOAD_MAX_SIZE_BYTES: ${BLOG_UPLOAD_MAX_SIZE_BYTES:-5242880}
+      BLOG_ADMIN_BOOTSTRAP_ENABLED: ${BLOG_ADMIN_BOOTSTRAP_ENABLED:-false}
+      BLOG_ADMIN_BOOTSTRAP_USERNAME: ${BLOG_ADMIN_BOOTSTRAP_USERNAME:-}
+      BLOG_ADMIN_BOOTSTRAP_PASSWORD: ${BLOG_ADMIN_BOOTSTRAP_PASSWORD:-}
+      BLOG_ADMIN_BOOTSTRAP_NICKNAME: ${BLOG_ADMIN_BOOTSTRAP_NICKNAME:-}
+    ports:
+      - "${PUBLIC_PORT:-8080}:8080"
+      - "${ADMIN_PORT:-8081}:8081"
+    volumes:
+      - app_uploads:/app/uploads
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  app_uploads:
+  mysql_data:
