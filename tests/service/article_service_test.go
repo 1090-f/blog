@@ -24,18 +24,26 @@ type fakeArticleStore struct {
 	popularFn     func(limit int) ([]model.Article, error)
 }
 
-func (f *fakeArticleStore) Create(article *model.Article) error                        { return f.createFn(article) }
-func (f *fakeArticleStore) FindByID(id uint) (*model.Article, error)                   { return f.findByIDFn(id) }
-func (f *fakeArticleStore) FindPublishedByID(id uint) (*model.Article, error)          { return f.findPubByIDFn(id) }
-func (f *fakeArticleStore) ListLatestPublished(limit int) ([]model.Article, error)     { return f.latestFn(limit) }
-func (f *fakeArticleStore) ListPopularPublished(limit int) ([]model.Article, error)    { return f.popularFn(limit) }
+func (f *fakeArticleStore) Create(article *model.Article) error      { return f.createFn(article) }
+func (f *fakeArticleStore) FindByID(id uint) (*model.Article, error) { return f.findByIDFn(id) }
+func (f *fakeArticleStore) FindPublishedByID(id uint) (*model.Article, error) {
+	return f.findPubByIDFn(id)
+}
+func (f *fakeArticleStore) ListLatestPublished(limit int) ([]model.Article, error) {
+	return f.latestFn(limit)
+}
+func (f *fakeArticleStore) ListPopularPublished(limit int) ([]model.Article, error) {
+	return f.popularFn(limit)
+}
 func (f *fakeArticleStore) List(filter dao.ArticleListFilter) ([]model.Article, int64, error) {
 	return f.listFn(filter)
 }
-func (f *fakeArticleStore) Update(article *model.Article) error               { return f.updateFn(article) }
-func (f *fakeArticleStore) Delete(id uint) error                              { return f.deleteFn(id) }
-func (f *fakeArticleStore) CountByCategoryID(categoryID uint) (int64, error)  { return f.countByCatFn(categoryID) }
-func (f *fakeArticleStore) IncrementViewCount(id uint) error                  { return f.incrementFn(id) }
+func (f *fakeArticleStore) Update(article *model.Article) error { return f.updateFn(article) }
+func (f *fakeArticleStore) Delete(id uint) error                { return f.deleteFn(id) }
+func (f *fakeArticleStore) CountByCategoryID(categoryID uint) (int64, error) {
+	return f.countByCatFn(categoryID)
+}
+func (f *fakeArticleStore) IncrementViewCount(id uint) error { return f.incrementFn(id) }
 
 type fakeCategoryStore struct {
 	findByIDFn func(id uint) (*model.Category, error)
@@ -118,6 +126,33 @@ func TestGetPublishedFullDetailIncludesComments(t *testing.T) {
 	}
 	if detail.Article.ViewCount != 4 {
 		t.Fatalf("expected view count 4, got %d", detail.Article.ViewCount)
+	}
+}
+
+func TestGetAdminDetailReturnsDraftWithoutIncreasingViewCount(t *testing.T) {
+	svc := service.NewArticleService(
+		&fakeArticleStore{
+			findByIDFn: func(id uint) (*model.Article, error) {
+				return &model.Article{ID: id, Status: service.ArticleStatusDraft, ViewCount: 3}, nil
+			},
+			incrementFn: func(id uint) error {
+				t.Fatal("admin detail must not increment the view count")
+				return nil
+			},
+		},
+		&fakeCategoryStore{},
+		&fakeCommentReadStore{},
+	)
+
+	article, err := svc.GetAdminDetail(1)
+	if err != nil {
+		t.Fatalf("expected admin detail success, got error: %v", err)
+	}
+	if article.Status != service.ArticleStatusDraft {
+		t.Fatalf("expected draft article, got %s", article.Status)
+	}
+	if article.ViewCount != 3 {
+		t.Fatalf("expected unchanged view count, got %d", article.ViewCount)
 	}
 }
 

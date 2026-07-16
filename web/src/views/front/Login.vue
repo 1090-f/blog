@@ -24,7 +24,7 @@
           {{ loading ? '登录中...' : '登录' }}
         </button>
       </form>
-      <div class="auth-footer">
+      <div v-if="!isAdminApp" class="auth-footer">
         还没有账号？<router-link to="/register">立即注册</router-link>
       </div>
     </div>
@@ -34,17 +34,19 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login } from '../../api/auth'
+import { adminLogin, login } from '../../api/auth'
 import { useUserStore } from '../../stores/user'
 import { message } from '../../utils/message'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const isAdminApp = window.__BLOG_APP_MODE__ === 'admin' || import.meta.env.MODE === 'admin'
 
 const form = ref({ username: '', password: '' })
 const loading = ref(false)
 
+// 处理用户操作或浏览器事件。
 async function handleLogin() {
   if (!form.value.username.trim() || !form.value.password.trim()) {
     message.warning('请输入用户名和密码')
@@ -53,7 +55,8 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    const res = await login(form.value)
+    const loginRequest = isAdminApp ? adminLogin : login
+    const res = await loginRequest(form.value)
     const { token, user } = res.data
     userStore.setAuth(token, user)
     message.success('登录成功')

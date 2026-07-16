@@ -10,8 +10,11 @@ import (
 	"blog/pkg/database"
 )
 
+// Main 启动 HTTP 服务。
 func Main() {
+	// 读取yaml配置
 	cfg := config.MustLoad()
+	// 校验关键配置
 	if strings.TrimSpace(cfg.JWT.Secret) == "" {
 		log.Fatal("jwt secret must not be empty")
 	}
@@ -25,13 +28,17 @@ func Main() {
 		log.Fatal("server.port and admin_server.port must be different")
 	}
 
+	// 连接数据库
 	db := database.MustOpen(cfg.Database)
+	// 管理员账户是否存在
 	if err := database.EnsureAdmin(db, cfg.AdminBootstrap); err != nil {
 		log.Fatal(err)
 	}
-
+	// 创建前台服务
 	publicEngine := router.New(cfg, db)
+	// 创建后台服务
 	adminEngine := router.NewAdmin(cfg, db)
+	// 启动前后台服务并监听错误
 	errCh := make(chan error, 2)
 	go func() { errCh <- publicEngine.Run(":" + cfg.Server.Port) }()
 	go func() { errCh <- adminEngine.Run(":" + cfg.AdminServer.Port) }()

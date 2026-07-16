@@ -13,9 +13,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// ensureDB 创建数据库（如果不存在）
+// ensureDB 连接 MySQL 并确保目标数据库存在，不存在时自动创建。
 func ensureDB(cfg config.DatabaseConfig) {
-	// 不指定数据库名连接 MySQL
+	// 不指定数据库名连接 MySQL，以便执行 CREATE DATABASE 语句
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local",
 		cfg.User,
@@ -30,7 +30,7 @@ func ensureDB(cfg config.DatabaseConfig) {
 		return
 	}
 
-	// 创建数据库
+	// 数据库不存在则创建，存在则跳过
 	sql := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", cfg.Name)
 	if err := db.Exec(sql).Error; err != nil {
 		log.Printf("[init] 创建数据库失败: %v", err)
@@ -40,6 +40,7 @@ func ensureDB(cfg config.DatabaseConfig) {
 	log.Printf("[init] 数据库 %s 已就绪", cfg.Name)
 }
 
+// MustOpen 数据库初始化，自动建表
 func MustOpen(cfg config.DatabaseConfig) *gorm.DB {
 	// 先确保数据库存在
 	ensureDB(cfg)
@@ -58,6 +59,7 @@ func MustOpen(cfg config.DatabaseConfig) *gorm.DB {
 		panic(err)
 	}
 
+	// 自动创建/更新所有业务表结构
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.Category{},
@@ -70,42 +72,13 @@ func MustOpen(cfg config.DatabaseConfig) *gorm.DB {
 	}
 
 	log.Println("[init] 数据表已同步")
-	if err := ensureGuestCommentSchema(db); err != nil {
-		panic(err)
-	}
 
 	return db
 }
 
-// ensureGuestCommentSchema makes user_id nullable for databases created before
-// anonymous comments were supported. AutoMigrate does not always relax an
-// existing NOT NULL constraint, so only those legacy schemas need a DDL change.
-func ensureGuestCommentSchema(db *gorm.DB) error {
-	columns, err := db.Migrator().ColumnTypes(&model.Comment{})
-	if err != nil {
-		return err
-	}
-
-	for _, column := range columns {
-		if column.Name() != "user_id" {
-			continue
-		}
-
-		nullable, ok := column.Nullable()
-		if !ok {
-			return fmt.Errorf("could not determine whether comments.user_id is nullable")
-		}
-		if nullable {
-			return nil
-		}
-
-		return db.Exec("ALTER TABLE comments MODIFY COLUMN user_id BIGINT UNSIGNED NULL").Error
-	}
-
-	return fmt.Errorf("comments.user_id column not found")
-}
-
+// EnsureAdmin 在管理员不存在时根据配置创建初始管理员账户，已存在则跳过。
 func EnsureAdmin(db *gorm.DB, cfg config.AdminBootstrapConfig) error {
+	// 控制是否自动创建管理员
 	if !cfg.Enabled {
 		return nil
 	}
@@ -113,19 +86,22 @@ func EnsureAdmin(db *gorm.DB, cfg config.AdminBootstrapConfig) error {
 	username := strings.TrimSpace(cfg.Username)
 	password := strings.TrimSpace(cfg.Password)
 	nickname := strings.TrimSpace(cfg.Nickname)
+	// 配置项不能为空
 	if username == "" || password == "" || nickname == "" {
 		return errors.New("admin bootstrap config is incomplete")
 	}
 
+	// 检查是否已存在管理员账号
 	var existing model.User
 	err := db.Where("role = ?", "admin").First(&existing).Error
 	if err == nil {
-		return nil
+		return nil // 已存在管理员，跳过创建
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
+	// 密码加密后写入数据库
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -136,7 +112,7 @@ func EnsureAdmin(db *gorm.DB, cfg config.AdminBootstrapConfig) error {
 		Password: string(hashedPassword),
 		Nickname: nickname,
 		Role:     "admin",
-		Status:   1,
+		Status:   1, // 默认启用状态
 	}
 
 	return db.Create(admin).Error

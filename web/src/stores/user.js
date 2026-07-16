@@ -13,9 +13,12 @@ export const useUserStore = defineStore('user', () => {
   } catch (e) { /* ignore */ }
   const user = ref(savedUser)
 
+  // 根据当前响应式状态计算派生数据。
   const isLoggedIn = computed(() => !!token.value)
+  // 根据当前响应式状态计算派生数据。
   const isAdmin = computed(() => user.value?.role === 'admin')
 
+  // 更新对应的状态值。
   function setAuth(t, u) {
     token.value = t
     user.value = u
@@ -23,6 +26,7 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('user', JSON.stringify(u))
   }
 
+  // 清除当前用户的登录状态。
   function logout() {
     token.value = ''
     user.value = null

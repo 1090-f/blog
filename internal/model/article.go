@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// Article 文章模型，关联分类、作者和标签。
 type Article struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
 	Title      string    `gorm:"size:150;not null" json:"title"`

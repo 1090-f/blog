@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// User 用户模型，存储账号、密码、角色及状态等信息。
 type User struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Username  string    `gorm:"size:50;uniqueIndex;not null" json:"username"`

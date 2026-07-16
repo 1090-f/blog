@@ -89,17 +89,20 @@ const stats = ref({
 const recentArticles = ref([])
 const loadingRecent = ref(false)
 
+// 将原始数据格式化为界面展示内容。
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// 加载当前页面所需的数据。
 async function fetchDashboard() {
   const res = await getDashboardStats()
   stats.value = { ...stats.value, ...(res.data || {}) }
 }
 
+// 加载当前页面所需的数据。
 async function fetchRecentArticles() {
   loadingRecent.value = true
   try {

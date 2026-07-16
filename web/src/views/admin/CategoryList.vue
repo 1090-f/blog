@@ -52,7 +52,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { createCategory, deleteCategory, getCategories, updateCategory } from '../../api/category'
+import { createCategory, deleteCategory, getAdminCategories, updateCategory } from '../../api/category'
 import { message } from '../../utils/message'
 
 const categories = ref([])
@@ -62,6 +62,7 @@ const editingId = ref(null)
 const form = ref({ name: '', description: '' })
 const saving = ref(false)
 
+// 打开对应的界面或选择器。
 function openDialog(row) {
   if (row) {
     editingId.value = row.id
@@ -73,16 +74,18 @@ function openDialog(row) {
   dialogVisible.value = true
 }
 
+// 加载当前页面所需的数据。
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getCategories()
+    const res = await getAdminCategories()
     categories.value = res.data || []
   } finally {
     loading.value = false
   }
 }
 
+// 处理用户操作或浏览器事件。
 async function handleSave() {
   if (!form.value.name.trim()) {
     message.warning('请输入分类名称')
@@ -105,6 +108,7 @@ async function handleSave() {
   }
 }
 
+// 处理用户操作或浏览器事件。
 async function handleDelete(id) {
   if (!window.confirm('确认删除这个分类吗？')) return
   try {

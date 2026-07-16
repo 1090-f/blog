@@ -1,8 +1,8 @@
 <template>
   <div class="archive-toolbar">
     <nav id="category-filter" class="archive-nav" aria-label="文章分类">
+      <button class="archive-nav-item archive-home" type="button" title="首页" @click="router.push('/')">⌂</button>
       <div class="archive-nav-list">
-        <button class="archive-nav-item archive-home" type="button" title="首页" @click="router.push('/')">⌂</button>
         <button class="archive-nav-item" :class="{ active: !selectedCategory && !selectedTag }" type="button" @click="router.push('/archive')">归档 <span class="archive-nav-count">{{ siteStats.articleCount }}</span></button>
         <button v-for="category in categories" :key="category.id" :ref="element => setCategoryButton(element, category.id)" class="archive-nav-item" :class="{ active: selectedCategory === category.id }" type="button" @click="selectCategory(category.id)">{{ category.name }} <span class="archive-nav-count">{{ category.articleCount || 0 }}</span></button>
       </div>
@@ -23,9 +23,12 @@ const props = defineProps({
 const router = useRouter()
 const route = useRoute()
 const categoryButtons = ref(new Map())
+// 根据当前响应式状态计算派生数据。
 const selectedCategory = computed(() => route.query.categoryId ? Number(route.query.categoryId) : null)
+// 根据当前响应式状态计算派生数据。
 const selectedTag = computed(() => route.query.tagId ? Number(route.query.tagId) : null)
 
+// 更新对应的状态值。
 function setCategoryButton(element, categoryId) {
   if (element) {
     categoryButtons.value.set(categoryId, element)
@@ -34,12 +37,14 @@ function setCategoryButton(element, categoryId) {
   }
 }
 
+// 处理当前模块的相关逻辑。
 async function scrollSelectedCategory() {
   await nextTick()
   const button = selectedCategory.value ? categoryButtons.value.get(selectedCategory.value) : null
   button?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
 }
 
+// 选中指定的数据项。
 async function selectCategory(categoryId) {
   await router.push({ path: '/archive', query: { categoryId, ...(selectedTag.value ? { tagId: selectedTag.value } : {}) } })
   scrollSelectedCategory()

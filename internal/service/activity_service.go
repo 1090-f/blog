@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// DailyActivity 单日活动明细（文章数、评论数、总数）。
 type DailyActivity struct {
 	Date     string `json:"date"`
 	Articles int64  `json:"articles"`
@@ -13,25 +14,30 @@ type DailyActivity struct {
 	Total    int64  `json:"total"`
 }
 
+// ActivityResponse 月度活动日历响应，按日列出活动明细。
 type ActivityResponse struct {
 	Year  int             `json:"year"`
 	Month int             `json:"month"`
 	Days  []DailyActivity `json:"days"`
 }
 
+// ActivityStore 活动统计服务所需的按日聚合操作抽象。
 type ActivityStore interface {
 	PublishedArticlesByDay(start, end time.Time) ([]dao.DailyActivityCount, error)
 	ApprovedCommentsByDay(start, end time.Time) ([]dao.DailyActivityCount, error)
 }
 
+// ActivityService 活动日历统计业务逻辑层。
 type ActivityService struct {
 	store ActivityStore
 }
 
+// NewActivityService 创建并初始化活动统计实例。
 func NewActivityService(store ActivityStore) *ActivityService {
 	return &ActivityService{store: store}
 }
 
+// Get 获取活动统计数据。
 func (s *ActivityService) Get(year, month int) (*ActivityResponse, error) {
 	if year == 0 || month == 0 {
 		now := time.Now()
@@ -46,6 +52,7 @@ func (s *ActivityService) Get(year, month int) (*ActivityResponse, error) {
 		return nil, fmt.Errorf("invalid activity month: %d", month)
 	}
 
+	// 查询该月每天的发布文章和评论数
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	end := start.AddDate(0, 1, 0)
 	articleRows, err := s.store.PublishedArticlesByDay(start, end)

@@ -8,8 +8,11 @@ RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM golang:1.22-alpine AS backend-builder
+FROM golang:1.24-alpine AS backend-builder
 WORKDIR /src
+
+# Use the Go module proxy when building from networks with limited access to proxy.golang.org.
+ENV GOPROXY=https://goproxy.cn,direct
 
 COPY go.mod go.sum ./
 RUN go mod download

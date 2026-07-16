@@ -28,6 +28,21 @@ func (f *fakeAdminHTTPUserStore) FindByID(id uint) (*model.User, error) {
 	return user, nil
 }
 
+func (f *fakeAdminHTTPUserStore) FindByUsername(username string) (*model.User, error) {
+	for _, user := range f.users {
+		if user.Username == username {
+			return user, nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (f *fakeAdminHTTPUserStore) Create(user *model.User) error {
+	user.ID = uint(len(f.users) + 1)
+	f.users[user.ID] = user
+	return nil
+}
+
 func (f *fakeAdminHTTPUserStore) List(filter dao.UserListFilter) ([]model.User, int64, error) {
 	list := make([]model.User, 0, len(f.users))
 	for _, user := range f.users {
@@ -42,6 +57,15 @@ func (f *fakeAdminHTTPUserStore) UpdateStatus(id uint, status int8) error {
 		return gorm.ErrRecordNotFound
 	}
 	user.Status = status
+	return nil
+}
+
+func (f *fakeAdminHTTPUserStore) UpdateRole(id uint, role string) error {
+	user, ok := f.users[id]
+	if !ok {
+		return gorm.ErrRecordNotFound
+	}
+	user.Role = role
 	return nil
 }
 

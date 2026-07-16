@@ -199,11 +199,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { marked } from 'marked'
 import { getArticleFull } from '../../api/article'
 import { createComment, deleteMyComment, getComments } from '../../api/comment'
 import { useUserStore } from '../../stores/user'
 import { message } from '../../utils/message'
+import { renderMarkdown } from '../../utils/markdown'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -220,14 +220,16 @@ const pageLoading = ref(false)
 const commentsLoading = ref(false)
 const replyTarget = ref(null)
 
+// 根据当前响应式状态计算派生数据。
 const renderedContent = computed(() => {
   try {
-    return marked(article.value?.content || '')
+    return renderMarkdown(article.value?.content || '')
   } catch (error) {
     return article.value?.content || ''
   }
 })
 
+// 根据当前响应式状态计算派生数据。
 const commentTree = computed(() => {
   const roots = []
   const byId = new Map()
@@ -236,6 +238,7 @@ const commentTree = computed(() => {
     byId.set(comment.id, { ...comment, children: [] })
   }
 
+  // 查找与当前条件匹配的数据。
   function findRootParentId(comment) {
     if (comment.parentId) {
       return comment.parentId
@@ -251,6 +254,7 @@ const commentTree = computed(() => {
     return replyTo.parentId || replyTo.id
   }
 
+  // 解析并返回关联的数据。
   function resolveReplyToAuthor(comment) {
     if (comment.replyToAuthor || !comment.replyToId) {
       return comment.replyToAuthor || null
@@ -282,6 +286,7 @@ const commentTree = computed(() => {
   return roots
 })
 
+// 将原始数据格式化为界面展示内容。
 function formatDate(dateStr) {
   if (!dateStr) {
     return '-'
@@ -294,14 +299,17 @@ function formatDate(dateStr) {
   return `${y}-${m}-${day}`
 }
 
+// 判断当前状态是否满足条件。
 function canReply(comment) {
   return !userStore.isLoggedIn || comment.userId !== userStore.user?.id
 }
 
+// 判断当前状态是否满足条件。
 function canDelete(comment) {
   return userStore.isLoggedIn && comment.userId === userStore.user?.id
 }
 
+// 处理当前模块的相关逻辑。
 async function removeComment(comment) {
   if (!canDelete(comment)) {
     return
@@ -319,11 +327,13 @@ async function removeComment(comment) {
   }
 }
 
+// 清理当前交互状态。
 function clearReply() {
   replyTarget.value = null
   replyContent.value = ''
 }
 
+// 启动对应的交互或定时任务。
 function startReply(comment) {
   if (!canReply(comment)) {
     return
@@ -332,11 +342,13 @@ function startReply(comment) {
   replyContent.value = ''
 }
 
+// 加载当前页面所需的数据。
 async function loadArticle() {
   const res = await getArticleFull(route.params.id)
   article.value = res.data
 }
 
+// 加载当前页面所需的数据。
 async function loadComments() {
   commentsLoading.value = true
   try {
@@ -347,6 +359,7 @@ async function loadComments() {
   }
 }
 
+// 初始化文章详情页的数据。
 async function initializePage() {
   pageLoading.value = true
   article.value = null
@@ -369,6 +382,7 @@ async function initializePage() {
   }
 }
 
+// 提交评论或回复内容。
 async function submitComment(targetComment = null) {
   const replyComment = targetComment || replyTarget.value
   const isInlineReply = !!targetComment
@@ -493,7 +507,10 @@ watch(
 
 .article-content :deep(h1),
 .article-content :deep(h2),
-.article-content :deep(h3) {
+.article-content :deep(h3),
+.article-content :deep(h4),
+.article-content :deep(h5),
+.article-content :deep(h6) {
   margin-top: 24px;
   margin-bottom: 12px;
   color: var(--text-primary);
@@ -518,9 +535,75 @@ watch(
   margin-bottom: 16px;
 }
 
+.article-content :deep(pre code) {
+  padding: 0;
+  background: transparent;
+}
+
+.article-content :deep(blockquote) {
+  margin: 16px 0;
+  padding: 10px 16px;
+  border-left: 4px solid var(--accent);
+  background: var(--accent-dim);
+  color: var(--text-secondary);
+}
+
+.article-content :deep(ul),
+.article-content :deep(ol) {
+  margin: 12px 0 16px;
+  padding-left: 28px;
+}
+
+.article-content :deep(li) {
+  margin: 6px 0;
+}
+
+.article-content :deep(input[type='checkbox']) {
+  margin-right: 7px;
+  accent-color: var(--accent);
+}
+
 .article-content :deep(img) {
   max-width: 100%;
   border-radius: var(--radius-sm);
+}
+
+.article-content :deep(video) {
+  display: block;
+  width: min(100%, 860px);
+  margin: 18px auto;
+  border-radius: var(--radius-sm);
+  background: #000;
+}
+
+.article-content :deep(.katex-display) {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 0;
+}
+
+.article-content :deep(table) {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+}
+
+.article-content :deep(th),
+.article-content :deep(td) {
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  text-align: left;
+}
+
+.article-content :deep(th) {
+  background: var(--accent-dim);
+}
+
+.article-content :deep(hr) {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--border-light);
 }
 
 .section-head {

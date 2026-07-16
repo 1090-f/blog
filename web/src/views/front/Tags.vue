@@ -47,10 +47,14 @@ import { getTags } from '../../api/tag'
 
 const tags = ref([])
 const loading = ref(true)
+// 根据当前响应式状态计算派生数据。
 const rankedTags = computed(() => [...tags.value].filter(tag => tag.articleCount > 0).sort((a, b) => b.articleCount - a.articleCount).slice(0, 10))
+// 根据当前响应式状态计算派生数据。
 const maxCount = computed(() => rankedTags.value[0]?.articleCount || 1)
+// 根据当前响应式状态计算派生数据。
 const popularThreshold = computed(() => Math.max(2, maxCount.value * .6))
 
+// 加载当前页面所需的数据。
 async function loadTags() {
   try {
     const response = await getTags()

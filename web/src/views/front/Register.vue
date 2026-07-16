@@ -68,6 +68,7 @@ const router = useRouter()
 const form = ref({ username: '', nickname: '', password: '', confirmPassword: '' })
 const loading = ref(false)
 
+// 处理用户操作或浏览器事件。
 async function handleRegister() {
   if (!form.value.username.trim() || !form.value.nickname.trim() || !form.value.password.trim()) {
     message.warning('请填写完整的注册信息')

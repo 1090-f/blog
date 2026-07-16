@@ -73,8 +73,11 @@ const mousePosition = ref({ x: 0.5, y: 0.5 })
 const hoverMessage = ref('')
 let petTalkTimer = null
 
+// 根据当前响应式状态计算派生数据。
 const message = computed(() => hoverMessage.value || messages[messageIndex.value])
+// 根据当前响应式状态计算派生数据。
 const petStyle = computed(() => ({ '--pet-x': `${position.value.x}px`, '--pet-y': `${position.value.y}px` }))
+// 根据当前响应式状态计算派生数据。
 const petImageStyle = computed(() => {
   const x = (mousePosition.value.x - 0.5) * 8
   const y = (mousePosition.value.y - 0.5) * 4
@@ -82,6 +85,7 @@ const petImageStyle = computed(() => {
   return { transform: `translate(${x}px, ${y}px) rotate(${rotate}deg)` }
 })
 
+// 计算指定眼睛的动态样式。
 function eyeStyle(side) {
   const horizontal = (mousePosition.value.x - 0.5) * 4
   const vertical = (mousePosition.value.y - 0.5) * 2.5
@@ -89,11 +93,13 @@ function eyeStyle(side) {
   return { transform: `translate(${horizontal + sideOffset}px, ${vertical}px)` }
 }
 
+// 显示桌宠的随机对话。
 function talk() {
   messageIndex.value = (messageIndex.value + 1) % messages.length
   hoverMessage.value = messages[messageIndex.value]
 }
 
+// 启动对应的交互或定时任务。
 function startPetTalk() {
   let index = 0
   hoverMessage.value = petHoverMessages[index]
@@ -104,12 +110,14 @@ function startPetTalk() {
   }, 1800)
 }
 
+// 停止对应的交互或定时任务。
 function stopPetTalk() {
   clearInterval(petTalkTimer)
   petTalkTimer = null
   hoverMessage.value = ''
 }
 
+// 启动对应的交互或定时任务。
 function startDrag(event) {
   if (event.button !== 0) return
   dragging.value = true
@@ -119,6 +127,7 @@ function startDrag(event) {
   window.addEventListener('pointerup', stopDrag, { once: true })
 }
 
+// 处理当前模块的相关逻辑。
 function onDrag(event) {
   position.value = {
     x: Math.max(8, Math.min(window.innerWidth - 155, event.clientX - dragOffset.value.x)),
@@ -126,12 +135,14 @@ function onDrag(event) {
   }
 }
 
+// 停止对应的交互或定时任务。
 function stopDrag() {
   dragging.value = false
   window.removeEventListener('pointermove', onDrag)
   localStorage.setItem('gin-blog-pet-position', JSON.stringify(position.value))
 }
 
+// 处理当前模块的相关逻辑。
 function followMouse(event) {
   mousePosition.value = {
     x: event.clientX / Math.max(window.innerWidth, 1),
@@ -139,16 +150,19 @@ function followMouse(event) {
   }
 }
 
+// 查找应显示提示的目标元素。
 function getHintTarget(target) {
   if (!(target instanceof Element) || target.closest('.blog-pet')) return null
   return target.closest('[data-pet-hint], a, button, h1, h2, h3, h4, h5, h6, p, li, label, time, .tag, .article-category, .article-title')
 }
 
+// 读取目标元素的提示文本。
 function getHintText(element) {
   const text = element.dataset.petHint || element.textContent.replace(/\s+/g, ' ').trim()
   return text.length > 52 ? `${text.slice(0, 52)}…` : text
 }
 
+// 处理用户操作或浏览器事件。
 function handleHintEnter(event) {
   const hintTarget = getHintTarget(event.target)
   if (!hintTarget || hintTarget.contains(event.relatedTarget)) return
@@ -156,6 +170,7 @@ function handleHintEnter(event) {
   if (text) hoverMessage.value = text
 }
 
+// 处理用户操作或浏览器事件。
 function handleHintLeave(event) {
   const hintTarget = getHintTarget(event.target)
   if (!hintTarget || hintTarget.contains(event.relatedTarget)) return

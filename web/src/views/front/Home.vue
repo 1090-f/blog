@@ -95,7 +95,28 @@
           <About />
         </div>
         <div v-else class="card">
-          <h2 class="section-title">最新文章</h2>
+          <div class="section-tabs" role="tablist" aria-label="文章排序方式">
+            <button
+              type="button"
+              class="section-tab"
+              :class="{ active: articleListType === 'latest' }"
+              :aria-selected="articleListType === 'latest'"
+              role="tab"
+              @click="articleListType = 'latest'"
+            >
+              最新文章
+            </button>
+            <button
+              type="button"
+              class="section-tab"
+              :class="{ active: articleListType === 'popular' }"
+              :aria-selected="articleListType === 'popular'"
+              role="tab"
+              @click="articleListType = 'popular'"
+            >
+              最热文章
+            </button>
+          </div>
           <div v-if="articles.length > 0" class="article-list">
             <div v-for="article in articles" :key="article.id" class="article-item" :data-pet-hint="`文章：${article.title}`" @click="goToArticle(article.id)">
               <span class="article-date">{{ formatDate(article.createdAt) }}</span>
@@ -105,7 +126,6 @@
           </div>
           <div v-else class="empty-state">
             <p>暂无文章</p>
-            <router-link to="/write" class="btn btn-primary">发布第一篇文章</router-link>
           </div>
         </div>
       </main>
@@ -154,7 +174,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getLatestArticles } from '../../api/article'
+import { getLatestArticles, getPopularArticles } from '../../api/article'
 import { getCategories } from '../../api/category'
 import { getTags } from '../../api/tag'
 import { getSiteStats } from '../../api/site'
@@ -164,9 +184,13 @@ import About from './About.vue'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const articles = ref([])
+const articleListType = ref('latest')
+const latestArticles = ref([])
+const popularArticles = ref([])
 const categories = ref([])
 const tags = ref([])
+const articles = computed(() => articleListType.value === 'popular' ? popularArticles.value : latestArticles.value)
+// 根据当前响应式状态计算派生数据。
 const aboutOpen = computed(() => route.query.panel === 'about')
 const siteStats = ref({
   articleCount: 0,
@@ -195,6 +219,7 @@ const authorLinks = [
 ]
 */
 
+// 将原始数据格式化为界面展示内容。
 function formatDate(dateStr) {
   const d = new Date(dateStr)
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -202,16 +227,19 @@ function formatDate(dateStr) {
   return `${month}-${day}`
 }
 
+// 将原始数据格式化为界面展示内容。
 function formatNumber(value) {
   return new Intl.NumberFormat('zh-CN').format(value || 0)
 }
 
+// 将原始数据格式化为界面展示内容。
 function formatRuntime(dateStr) {
   if (!dateStr) return '—'
   const days = Math.max(1, Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000))
   return `${days} 天`
 }
 
+// 将原始数据格式化为界面展示内容。
 function formatLastActivity(dateStr) {
   if (!dateStr) return '—'
   const days = Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000))
@@ -219,18 +247,22 @@ function formatLastActivity(dateStr) {
   return `${days} 天前`
 }
 
+// 跳转到对应页面。
 function goToArticle(id) {
   router.push(`/article/${id}`)
 }
 
+// 跳转到对应页面。
 function goToCategory(categoryId) {
   router.push({ path: '/archive', query: { categoryId } })
 }
 
+// 跳转到对应页面。
 function goToTag(tagId) {
   router.push({ path: '/archive', query: { tagId } })
 }
 
+// 切换对应的界面状态。
 function toggleAbout() {
   const query = { ...route.query }
   if (aboutOpen.value) {
@@ -243,13 +275,21 @@ function toggleAbout() {
 
 onMounted(async () => {
   try {
-    const [articlesRes, categoriesRes, tagsRes, statsRes] = await Promise.all([getLatestArticles(10), getCategories(), getTags(), getSiteStats()])
-    articles.value = articlesRes.data || []
+    const [latestRes, popularRes, categoriesRes, tagsRes, statsRes] = await Promise.all([
+      getLatestArticles(10),
+      getPopularArticles(10),
+      getCategories(),
+      getTags(),
+      getSiteStats()
+    ])
+    latestArticles.value = latestRes.data || []
+    popularArticles.value = popularRes.data || []
     categories.value = categoriesRes.data || []
     tags.value = tagsRes.data || []
     siteStats.value = { ...siteStats.value, ...(statsRes.data || {}) }
   } catch (error) {
-    articles.value = []
+    latestArticles.value = []
+    popularArticles.value = []
     categories.value = []
     tags.value = []
   }
@@ -484,12 +524,48 @@ onMounted(async () => {
   font-size: 13px;
 }
 
-.section-title {
+.section-tabs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-tab {
+  position: relative;
+  padding: 0 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.section-tab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0;
+  transform: scaleX(0.45);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.section-tab:hover,
+.section-tab.active {
+  color: var(--text-primary);
+}
+
+.section-tab.active::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .article-list {

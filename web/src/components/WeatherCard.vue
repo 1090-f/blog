@@ -44,6 +44,15 @@ import { onMounted, onUnmounted, ref } from 'vue'
 const WEATHER_REFRESH_INTERVAL = 30 * 60 * 1000
 const FALLBACK_LOCATION = '新乡市 红旗区'
 const FALLBACK_COORDINATES = { latitude: 35.303, longitude: 113.926 }
+let simplifiedChineseConverterPromise
+
+function getSimplifiedChineseConverter() {
+  if (!simplifiedChineseConverterPromise) {
+    simplifiedChineseConverterPromise = import('opencc-js/t2cn')
+      .then(({ default: OpenCC }) => OpenCC.Converter({ from: 'tw', to: 'cn' }))
+  }
+  return simplifiedChineseConverterPromise
+}
 
 const weather = ref({
   location: FALLBACK_LOCATION,
@@ -78,6 +87,7 @@ const weatherConditions = {
   99: '雷雨'
 }
 
+// 加载当前页面所需的数据。
 async function loadWeather() {
   try {
     const params = new URLSearchParams({
@@ -104,6 +114,33 @@ async function loadWeather() {
   }
 }
 
+// 将浏览器定位得到的经纬度转换为可读的城市、区县名称。
+async function loadLocationName({ latitude, longitude }) {
+  try {
+    const params = new URLSearchParams({
+      latitude: String(latitude),
+      longitude: String(longitude),
+      localityLanguage: 'zh'
+    })
+    const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${params}`)
+    if (!response.ok) throw new Error('reverse geocoding request failed')
+
+    const data = await response.json()
+    const toSimplifiedChinese = await getSimplifiedChineseConverter()
+    const locationParts = [data.city, data.locality]
+      .map(part => part ? toSimplifiedChinese(part.trim()) : '')
+      .filter((part, index, parts) => part && parts.indexOf(part) === index)
+
+    const locationName = locationParts.join(' ') || data.principalSubdivision?.trim()
+    if (locationName) {
+      weather.value = { ...weather.value, location: locationName }
+    }
+  } catch {
+    weather.value = { ...weather.value, location: '当前位置' }
+  }
+}
+
+// 请求浏览器提供所需信息。
 function requestCurrentLocation() {
   if (!navigator.geolocation) return
 
@@ -113,8 +150,9 @@ function requestCurrentLocation() {
         latitude: coords.latitude,
         longitude: coords.longitude
       }
-      weather.value = { ...weather.value, location: '当前位置' }
+      weather.value = { ...weather.value, location: '正在定位…' }
       loadWeather()
+      loadLocationName(coordinates.value)
     },
     () => {
       // Keep the configured city when location permission is denied or unavailable.

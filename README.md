@@ -14,8 +14,9 @@
 - 分类、标签和归档浏览
 - 站点统计与按月文章活动数据
 - Markdown 文章内容渲染
-- 用户注册、登录、个人资料维护
-- 登录用户发表文章、创建分类、发表评论与删除自己的评论
+- 用户注册、登录与会话恢复
+- 游客可填写昵称、邮箱和可选网站发表评论；登录用户以账户身份发表评论并可删除自己的评论
+- 文章、分类和标签仅可由管理员在后台管理
 - 图片上传（JPEG、PNG、WebP）
 
 ### 管理后台
@@ -134,7 +135,7 @@ npm run dev:admin  # http://localhost:3001/admin
 npm run dev:all
 ```
 
-Vite 会将公开 API 请求代理到 `8080`，将管理 API 请求代理到 `8081`。
+Vite 在公开模式下会将 `/api` 代理到 `8080`；在管理模式下会将 `/api` 代理到 `8081`。`/uploads` 始终代理到公开服务 `8080`。
 
 ### 5. 构建并使用一体化服务
 
@@ -153,7 +154,7 @@ go run .
 
 - 公开接口：分类、标签、文章、评论、站点统计与文章活动
 - 认证接口：`POST /api/auth/register`、`POST /api/auth/login`
-- 登录接口：个人资料、发文、建分类、评论与上传
+- 登录接口：会话查询、删除自己的评论
 - 管理接口：`/api/admin/*`，需要管理员 JWT
 
 具体请求参数、响应格式与权限要求见 [API 文档](docs/api.md)。
@@ -167,6 +168,8 @@ Copy-Item docker/.env.example docker/.env
 # 编辑 docker/.env，替换数据库密码和 BLOG_JWT_SECRET
 docker compose --env-file docker/.env -f docker/compose.yaml up -d --build
 ```
+
+Docker 会重新构建前后端；公开端口仅用于浏览和评论，文章发布、分类标签维护及图片上传请使用管理员后台端口。
 
 公开站点默认访问 `http://localhost:8080`，管理后台默认访问 `http://localhost:8081/admin`。更多操作、数据持久化与生产注意事项见 [Docker 部署说明](docs/deployment.md#docker-compose-部署)。
 

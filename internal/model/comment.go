@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// Comment 评论模型，支持注册用户评论和游客评论，以及评论嵌套回复。
 type Comment struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	ArticleID    uint      `gorm:"not null" json:"articleId"`

@@ -68,8 +68,8 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { deleteArticle, getAdminArticles } from '../../api/article'
-import { getCategories } from '../../api/category'
-import { getTags } from '../../api/tag'
+import { getAdminCategories } from '../../api/category'
+import { getAdminTags } from '../../api/tag'
 import { message } from '../../utils/message'
 
 const articles = ref([])
@@ -84,17 +84,20 @@ const categoryId = ref('')
 const tagId = ref('')
 const statusFilter = ref('')
 
+// 将原始数据格式化为界面展示内容。
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// 处理用户操作或浏览器事件。
 function handleSearch() {
   page.value = 1
   fetchData()
 }
 
+// 重置当前筛选条件。
 function resetFilters() {
   keyword.value = ''
   categoryId.value = ''
@@ -103,21 +106,25 @@ function resetFilters() {
   handleSearch()
 }
 
+// 更新当前筛选条件或页面状态。
 function changePage(nextPage) {
   page.value = nextPage
   fetchData()
 }
 
+// 加载当前页面所需的数据。
 async function fetchCategories() {
-  const res = await getCategories()
+  const res = await getAdminCategories()
   categories.value = res.data || []
 }
 
+// 加载当前页面所需的数据。
 async function fetchTags() {
-  const res = await getTags()
+  const res = await getAdminTags()
   tags.value = res.data || []
 }
 
+// 加载当前页面所需的数据。
 async function fetchData() {
   loading.value = true
   try {
@@ -135,6 +142,7 @@ async function fetchData() {
   }
 }
 
+// 处理用户操作或浏览器事件。
 async function handleDelete(id) {
   if (!window.confirm('确认删除这篇文章吗？')) return
   try {

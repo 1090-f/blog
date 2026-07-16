@@ -10,7 +10,7 @@ If older planning notes conflict with code, treat the code and this file as the 
 - Health check path: `/health`
 - API base path: `/api`
 - Authenticated requests use `Authorization: Bearer <token>`
-- `POST /api/upload` is available only when both `upload.dir` and `upload.url` are configured
+- `POST /api/admin/upload` is available only when both `upload.dir` and `upload.url` are configured
 - `jwt.secret` in `config/config.yaml` must be replaced before production use
 - Optional first-admin provisioning is controlled by `admin_bootstrap`
 
@@ -116,7 +116,7 @@ List public comments for one published article.
 Create a comment for a published article. Authentication is optional:
 
 - when a valid JWT is supplied, the comment is associated with the current user
-- without a JWT, `guestName` and `guestEmail` are required; `guestWebsite` is optional and must use `http` or `https`
+- without a JWT, `guestName` and a valid `guestEmail` are required; `guestWebsite` is optional and must use `http` or `https`
 
 Guest request example:
 
@@ -131,7 +131,7 @@ Guest request example:
 }
 ```
 
-`replyToId` is optional. Guest email addresses are used only for comment records and are not returned by public comment APIs.
+`replyToId` is optional. For an authenticated request, guest fields are ignored and the comment is attributed to the current account. Guest email addresses are used only for comment records and are not returned by public comment APIs.
 
 ## Auth APIs
 
@@ -194,51 +194,16 @@ These APIs require authentication but do not require admin role.
 
 Delete a comment created by the current user.
 
-### POST `/api/articles`
-
-Create an article as the current logged-in user.
-
-Request:
-
-```json
-{
-  "title": "First Post",
-  "summary": "Short summary",
-  "content": "Markdown or HTML content",
-  "coverImage": "/uploads/articles/2026/06/cover.jpg",
-  "status": "published",
-  "categoryId": 1,
-  "tagIds": [1, 3]
-}
-```
-
-Current behavior:
-
-- normal logged-in users can create articles
-- current implementation also allows normal logged-in users to publish articles
-
-### POST `/api/categories`
-
-Create a category as the current logged-in user.
-
-Request:
-
-```json
-{
-  "name": "Backend",
-  "description": "Server side posts"
-}
-```
-
 ## Upload API
 
-### POST `/api/upload`
+### POST `/api/admin/upload`
 
 Upload one image file using form field `file`.
 
 Requires:
 
 - valid JWT token
+- current user role is `admin`
 - upload storage configured
 
 Validation:
@@ -265,10 +230,18 @@ Response:
 
 ## Admin APIs
 
-All admin APIs require:
+Except `POST /api/admin/login`, all admin APIs require:
 
 - valid JWT token
 - current user role is `admin`
+
+### POST `/api/admin/login`
+
+Log in as an administrator. Non-administrator accounts receive `403`.
+
+### GET `/api/admin/session`
+
+Get the current administrator session information.
 
 ### GET `/api/admin/dashboard`
 
@@ -297,6 +270,10 @@ Query:
 - `status`: optional, `draft` or `published`
 - `keyword`: optional, fuzzy match against title
 
+### GET `/api/admin/articles/:id`
+
+Get an article for editing. This endpoint can return drafts and does not increase `viewCount`.
+
 ### POST `/api/admin/articles`
 
 Create an article.
@@ -313,6 +290,10 @@ Notes:
 
 - deletion is rejected when comments still reference the article
 
+### GET `/api/admin/categories`
+
+List categories for administration.
+
 ### POST `/api/admin/categories`
 
 Create a category.
@@ -328,6 +309,10 @@ Delete a category.
 Notes:
 
 - deletion is rejected when articles still use the category
+
+### GET `/api/admin/tags`
+
+List tags for administration.
 
 ### POST `/api/admin/tags`
 
@@ -395,7 +380,7 @@ Rules:
 
 - Public article APIs only return `published` articles
 - Public comment APIs only return comments with `status = 1`
-- The public and management HTTP services both expose `/health` and the base API routes; only the management service exposes `/api/admin/*`
+- The public and management HTTP services both expose `/health`; public APIs are served only by the public service, while the management service exposes only `/api/admin/*`
 - Admin article queries support title keyword filtering
 - Logger middleware records `method`, `path`, `status`, and `latency`
 - Recovery middleware logs panic details and still returns the unified error envelope

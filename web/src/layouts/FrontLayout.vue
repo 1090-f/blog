@@ -222,10 +222,14 @@ const siteStats = ref({
   lastActivityAt: null
 })
 const authorName = '冬'
+// 根据当前响应式状态计算派生数据。
 const showArchiveToolbar = computed(() => ['Home', 'Archive', 'Article', 'Categories', 'Tags'].includes(route.name))
+// 根据当前响应式状态计算派生数据。
 const visibleCategories = computed(() => categories.value.slice(0, 6))
+// 根据当前响应式状态计算派生数据。
 const visibleTags = computed(() => tags.value.slice(0, 8))
 
+// 处理用户操作或浏览器事件。
 function handleLogout() {
   mobileOpen.value = false
   userMenuOpen.value = false
@@ -233,46 +237,55 @@ function handleLogout() {
   router.push('/')
 }
 
+// 跳转到对应页面。
 function goAbout() {
   router.push({ name: 'Home', query: { panel: 'about' } })
 }
 
+// 处理用户操作或浏览器事件。
 function handleArticleMenuFocusOut(event) {
   if (!event.currentTarget.contains(event.relatedTarget)) {
     articleMenuOpen.value = false
   }
 }
 
+// 处理用户操作或浏览器事件。
 function handleUserMenuFocusOut(event) {
   if (!event.currentTarget.contains(event.relatedTarget)) {
     userMenuOpen.value = false
   }
 }
 
+// 跳转到对应页面。
 function goToCategory(categoryId) {
   router.push({ path: '/archive', query: { categoryId } })
 }
 
+// 跳转到对应页面。
 function goToTag(tagId) {
   router.push({ path: '/archive', query: { tagId } })
 }
 
+// 将原始数据格式化为界面展示内容。
 function formatNumber(value) {
   return new Intl.NumberFormat('zh-CN').format(value || 0)
 }
 
+// 将原始数据格式化为界面展示内容。
 function formatRuntime(dateStr) {
   if (!dateStr) return '—'
   const days = Math.max(1, Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000))
   return `${days} 天`
 }
 
+// 将原始数据格式化为界面展示内容。
 function formatLastActivity(dateStr) {
   if (!dateStr) return '—'
   const days = Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000))
   return days === 0 ? '今天' : `${days} 天前`
 }
 
+// 加载当前页面所需的数据。
 async function loadCategoryCounts(rawCategories) {
   return Promise.all(rawCategories.map(async category => {
     try {

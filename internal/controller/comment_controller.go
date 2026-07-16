@@ -11,18 +11,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// CommentController 提供公开评论操作：按文章查询、创建评论、删除自己的评论。
 type CommentController struct {
 	commentService *service.CommentService
 }
 
+// NewCommentController 创建并初始化评论接口实例。
 func NewCommentController(commentService *service.CommentService) *CommentController {
 	return &CommentController{commentService: commentService}
 }
 
+// ListByArticle 查询评论接口列表。
 func (ctl *CommentController) ListByArticle(c *gin.Context) {
 	articleID, ok := parseUintParam(c, "id")
 	if !ok {
-		response.Error(c, http.StatusBadRequest, 4001, "invalid request params")
+		response.Error(c, http.StatusBadRequest, 4001, "请求参数无效")
 		return
 	}
 
@@ -32,7 +35,7 @@ func (ctl *CommentController) ListByArticle(c *gin.Context) {
 		case errors.Is(err, service.ErrArticleNotFound):
 			response.Error(c, http.StatusNotFound, 4043, err.Error())
 		default:
-			response.Error(c, http.StatusInternalServerError, 5015, "failed to fetch comments")
+			response.Error(c, http.StatusInternalServerError, 5015, "获取评论列表失败")
 		}
 		return
 	}
@@ -40,10 +43,11 @@ func (ctl *CommentController) ListByArticle(c *gin.Context) {
 	response.Success(c, toCommentResponses(comments))
 }
 
+// Create 创建评论接口记录。
 func (ctl *CommentController) Create(c *gin.Context) {
 	var req dto.CreateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 4001, "invalid request params")
+		response.Error(c, http.StatusBadRequest, 4001, "请求参数无效")
 		return
 	}
 
@@ -61,7 +65,7 @@ func (ctl *CommentController) Create(c *gin.Context) {
 			errors.Is(err, service.ErrInvalidGuestWebsite):
 			response.Error(c, http.StatusBadRequest, 4005, err.Error())
 		default:
-			response.Error(c, http.StatusInternalServerError, 5016, "failed to create comment")
+			response.Error(c, http.StatusInternalServerError, 5016, "创建评论失败")
 		}
 		return
 	}
@@ -69,10 +73,11 @@ func (ctl *CommentController) Create(c *gin.Context) {
 	response.Success(c, toCommentResponse(*comment))
 }
 
+// DeleteMine 删除评论接口记录。
 func (ctl *CommentController) DeleteMine(c *gin.Context) {
 	id, ok := parseUintParam(c, "id")
 	if !ok {
-		response.Error(c, http.StatusBadRequest, 4001, "invalid request params")
+		response.Error(c, http.StatusBadRequest, 4001, "请求参数无效")
 		return
 	}
 
@@ -83,7 +88,7 @@ func (ctl *CommentController) DeleteMine(c *gin.Context) {
 		case errors.Is(err, service.ErrCommentForbidden):
 			response.Error(c, http.StatusForbidden, 4030, err.Error())
 		default:
-			response.Error(c, http.StatusInternalServerError, 5017, "failed to delete comment")
+			response.Error(c, http.StatusInternalServerError, 5017, "删除评论失败")
 		}
 		return
 	}
@@ -91,6 +96,7 @@ func (ctl *CommentController) DeleteMine(c *gin.Context) {
 	response.Success(c, gin.H{"deleted": true})
 }
 
+// 将内部数据转换为接口响应结构。
 func toCommentResponses(comments []model.Comment) []dto.CommentResponse {
 	resp := make([]dto.CommentResponse, 0, len(comments))
 	for _, comment := range comments {
@@ -99,6 +105,7 @@ func toCommentResponses(comments []model.Comment) []dto.CommentResponse {
 	return resp
 }
 
+// 将内部数据转换为接口响应结构。
 func toCommentResponse(comment model.Comment) dto.CommentResponse {
 	resp := dto.CommentResponse{
 		ID:        comment.ID,
@@ -119,6 +126,7 @@ func toCommentResponse(comment model.Comment) dto.CommentResponse {
 	return resp
 }
 
+// commentAuthor 根据登录用户和游客返回对应的评论作者信息
 func commentAuthor(comment model.Comment) dto.CommentAuthorResponse {
 	if comment.User != nil {
 		return dto.CommentAuthorResponse{

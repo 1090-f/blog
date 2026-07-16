@@ -111,22 +111,26 @@ const page = ref(1)
 const pageSize = 10
 const total = ref(0)
 
+// 将原始数据格式化为界面展示内容。
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+// 处理用户操作或浏览器事件。
 function handleSearch() {
   page.value = 1
   fetchComments()
 }
 
+// 更新当前筛选条件或页面状态。
 function changePage(nextPage) {
   page.value = nextPage
   fetchComments()
 }
 
+// 加载当前页面所需的数据。
 async function fetchComments() {
   loading.value = true
   try {
@@ -143,6 +147,7 @@ async function fetchComments() {
   }
 }
 
+// 切换对应的界面状态。
 async function toggleStatus(comment) {
   savingId.value = comment.id
   try {
@@ -155,6 +160,7 @@ async function toggleStatus(comment) {
   }
 }
 
+// 处理当前模块的相关逻辑。
 async function removeComment(comment) {
   if (!window.confirm('确定删除这条评论吗？删除后不可恢复。')) return
 

@@ -39,8 +39,10 @@ import { getSiteStats } from '../../api/site'
 const categories = ref([])
 const siteStats = ref({ articleCount: 0 })
 const loading = ref(true)
+// 根据当前响应式状态计算派生数据。
 const totalArticles = computed(() => siteStats.value.articleCount || categories.value.reduce((sum, category) => sum + category.articleCount, 0))
 
+// 加载当前页面所需的数据。
 async function loadCategories() {
   try {
     const [categoryResponse, statsResponse] = await Promise.all([getCategories(), getSiteStats()])

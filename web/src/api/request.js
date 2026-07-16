@@ -8,20 +8,31 @@ const request = axios.create({
   timeout: 10000
 })
 
-let isHandlingExpiredToken = false
+let isHandlingInvalidSession = false
 
-function handleExpiredToken() {
-  if (isHandlingExpiredToken) {
+function localizeErrorMessage(messageText) {
+  const messages = {
+    'invalid username or password': '用户名或密码错误',
+    'user is disabled': '账号已被禁用，请联系管理员',
+    'network error': '网络连接失败',
+    'request failed': '请求失败'
+  }
+  return messages[messageText?.toLowerCase()] || messageText
+}
+
+// 处理用户操作或浏览器事件。
+function handleInvalidSession(reason) {
+  if (isHandlingInvalidSession) {
     return
   }
 
-  isHandlingExpiredToken = true
+  isHandlingInvalidSession = true
 
   const userStore = useUserStore()
   const redirect = router.currentRoute.value.fullPath
 
   userStore.logout()
-  message.warning('登录已过期，请重新登录')
+  message.warning(reason)
 
   const isLoginPage = router.currentRoute.value.name === 'Login'
   if (!isLoginPage) {
@@ -29,7 +40,7 @@ function handleExpiredToken() {
   }
 
   window.setTimeout(() => {
-    isHandlingExpiredToken = false
+    isHandlingInvalidSession = false
   }, 0)
 }
 
@@ -47,7 +58,7 @@ request.interceptors.request.use(config => {
 request.interceptors.response.use(
   res => {
     if (res.data.code !== 0) {
-      message.error(res.data.message || 'Request failed')
+      message.error(localizeErrorMessage(res.data.message) || '请求失败')
       return Promise.reject(res.data)
     }
     return res.data
@@ -57,13 +68,20 @@ request.interceptors.response.use(
     const code = err.response?.data?.code
     const userStore = useUserStore()
 
-    if (status === 401 && code === 4010 && userStore.token) {
-      handleExpiredToken()
+    if (userStore.token && status === 401 && code === 4010) {
+      handleInvalidSession('登录已过期，请重新登录')
       return Promise.reject(err)
     }
 
-    const msg = err.response?.data?.message || 'Network error'
-    message.error(msg)
+    if (userStore.token && status === 403 && code === 4031) {
+      handleInvalidSession('账号已被禁用，已自动退出登录')
+      return Promise.reject(err)
+    }
+
+    const msg = err.response?.data?.message || '网络连接失败'
+    if (!err.config?.skipErrorMessage) {
+      message.error(localizeErrorMessage(msg))
+    }
     return Promise.reject(err)
   }
 )

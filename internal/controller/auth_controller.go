@@ -11,18 +11,21 @@ import (
 	"gorm.io/gorm"
 )
 
+// AuthController 处理用户注册、登录、管理端登录及会话查询。
 type AuthController struct {
 	authService *service.AuthService
 }
 
+// NewAuthController 创建并初始化认证接口实例。
 func NewAuthController(authService *service.AuthService) *AuthController {
 	return &AuthController{authService: authService}
 }
 
+// Register 注册用户。
 func (ctl *AuthController) Register(c *gin.Context) {
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 4001, "invalid request params")
+		response.Error(c, http.StatusBadRequest, 4001, "请求参数无效")
 		return
 	}
 
@@ -32,7 +35,7 @@ func (ctl *AuthController) Register(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, 4002, err.Error())
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 5001, "failed to register user")
+		response.Error(c, http.StatusInternalServerError, 5001, "注册用户失败")
 		return
 	}
 
@@ -44,10 +47,20 @@ func (ctl *AuthController) Register(c *gin.Context) {
 	})
 }
 
+// Login 验证用户凭据并签发登录令牌。
 func (ctl *AuthController) Login(c *gin.Context) {
+	ctl.login(c, false)
+}
+
+// AdminLogin 验证管理员凭据并签发令牌。
+func (ctl *AuthController) AdminLogin(c *gin.Context) {
+	ctl.login(c, true)
+}
+
+func (ctl *AuthController) login(c *gin.Context, adminOnly bool) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 4001, "invalid request params")
+		response.Error(c, http.StatusBadRequest, 4001, "请求参数无效")
 		return
 	}
 
@@ -59,14 +72,19 @@ func (ctl *AuthController) Login(c *gin.Context) {
 		case errors.Is(err, service.ErrUserDisabled):
 			response.Error(c, http.StatusForbidden, 4031, err.Error())
 		default:
-			response.Error(c, http.StatusInternalServerError, 5002, "failed to login")
+			response.Error(c, http.StatusInternalServerError, 5002, "登录失败")
 		}
+		return
+	}
+	if adminOnly && loginResponse.User.Role != "admin" {
+		response.Error(c, http.StatusForbidden, 4030, "需要管理员权限")
 		return
 	}
 
 	response.Success(c, loginResponse)
 }
 
+// Session 获取当前登录会话的用户信息。
 func (ctl *AuthController) Session(c *gin.Context) {
 	userID := c.GetUint("userID")
 
@@ -74,11 +92,11 @@ func (ctl *AuthController) Session(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
-			response.Error(c, http.StatusNotFound, 4041, "user not found")
+			response.Error(c, http.StatusNotFound, 4041, "用户不存在")
 		case errors.Is(err, service.ErrUserDisabled):
 			response.Error(c, http.StatusForbidden, 4031, err.Error())
 		default:
-			response.Error(c, http.StatusInternalServerError, 5003, "failed to fetch current user")
+			response.Error(c, http.StatusInternalServerError, 5003, "获取当前用户信息失败")
 		}
 		return
 	}

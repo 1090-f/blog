@@ -57,7 +57,7 @@ npm run dev:admin  # 管理站点：http://localhost:3001/admin
 npm run dev:all    # 同时启动以上两个服务
 ```
 
-Vite 会把 `/api` 和 `/uploads` 代理到公开服务 `8080`，并把 `/admin-api` 代理到管理服务 `8081`。
+Vite 在公开模式下会把 `/api` 和 `/uploads` 代理到公开服务 `8080`；在管理模式下会把 `/api` 代理到管理服务 `8081`，`/uploads` 仍代理到公开服务 `8080`。
 
 ## 构建一体化站点
 

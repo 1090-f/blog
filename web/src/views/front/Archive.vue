@@ -52,6 +52,7 @@ const total = ref(0)
 const selectedCategory = ref(null)
 const selectedTag = ref(null)
 
+// 根据当前响应式状态计算派生数据。
 const groupedArticles = computed(() => articles.value.reduce((groups, article) => {
   const year = new Date(article.createdAt).getFullYear()
   if (!groups[year]) groups[year] = []
@@ -59,22 +60,26 @@ const groupedArticles = computed(() => articles.value.reduce((groups, article) =
   return groups
 }, {}))
 
+// 根据当前响应式状态计算派生数据。
 const archiveTitle = computed(() => {
   if (selectedCategory.value) return categories.value.find(item => item.id === selectedCategory.value)?.name || '分类归档'
   if (selectedTag.value) return `标签：${tags.value.find(item => item.id === selectedTag.value)?.name || ''}`
   return '全部文章'
 })
 
+// 将原始数据格式化为界面展示内容。
 function formatDate(dateStr) {
   const date = new Date(dateStr)
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+// 更新当前筛选条件或页面状态。
 function changePage(nextPage) {
   page.value = nextPage
   fetchArticles()
 }
 
+// 加载当前页面所需的数据。
 async function fetchArticles() {
   loading.value = true
   try {

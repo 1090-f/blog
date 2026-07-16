@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
+const isAdminApp = window.__BLOG_APP_MODE__ === 'admin' || import.meta.env.MODE === 'admin'
+
 const routes = [
   {
     path: '/',
@@ -12,12 +14,13 @@ const routes = [
       { path: 'tags', name: 'Tags', component: () => import('../views/front/Tags.vue') },
       { path: 'archive', name: 'Archive', component: () => import('../views/front/Archive.vue') },
       { path: 'about', name: 'About', component: () => import('../views/front/About.vue') },
-      { path: 'article/:id', name: 'Article', component: () => import('../views/front/Article.vue') },
-      { path: 'write', name: 'WriteArticle', component: () => import('../views/front/WriteArticle.vue'), meta: { requiresAuth: true } }
+      { path: 'article/:id', name: 'Article', component: () => import('../views/front/Article.vue') }
     ]
   },
   { path: '/login', name: 'Login', component: () => import('../views/front/Login.vue') },
-  { path: '/register', name: 'Register', component: () => import('../views/front/Register.vue') },
+  isAdminApp
+    ? { path: '/register', redirect: '/login' }
+    : { path: '/register', name: 'Register', component: () => import('../views/front/Register.vue') },
   {
     path: '/admin',
     component: () => import('../layouts/AdminLayout.vue'),
@@ -35,7 +38,7 @@ const routes = [
   }
 ]
 
-if (import.meta.env.MODE === 'admin') {
+if (isAdminApp) {
   routes.unshift({ path: '/', redirect: '/admin' })
 }
 

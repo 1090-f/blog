@@ -70,12 +70,14 @@ const pageTitles = {
   '/admin/users': '用户管理'
 }
 
+// 根据当前响应式状态计算派生数据。
 const pageTitle = computed(() => {
   if (route.path.includes('/admin/article/new')) return '新建文章'
   if (route.path.includes('/admin/article/edit/')) return '编辑文章'
   return pageTitles[route.path] || '管理后台'
 })
 
+// 处理用户操作或浏览器事件。
 function handleLogout() {
   userStore.logout()
   router.push('/')

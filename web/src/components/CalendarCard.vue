@@ -41,7 +41,9 @@ const displayedMonth = ref(new Date(now.getFullYear(), now.getMonth(), 1))
 const selectedDate = ref(new Date(now.getFullYear(), now.getMonth(), now.getDate()))
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
+// 根据当前响应式状态计算派生数据。
 const firstWeekday = computed(() => displayedMonth.value.getDay())
+// 根据当前响应式状态计算派生数据。
 const daysInMonth = computed(() => new Date(
   displayedMonth.value.getFullYear(),
   displayedMonth.value.getMonth() + 1,
@@ -49,7 +51,9 @@ const daysInMonth = computed(() => new Date(
 ).getDate())
 
 const activityByDay = ref({})
+// 根据当前响应式状态计算派生数据。
 const maxActivity = computed(() => Math.max(1, ...Object.values(activityByDay.value)))
+// 根据当前响应式状态计算派生数据。
 const activityLevels = computed(() => {
   const cellCount = Math.ceil((firstWeekday.value + daysInMonth.value) / 7) * 7
   return Array.from({ length: cellCount }, (_, index) => {
@@ -65,6 +69,7 @@ const activityLevels = computed(() => {
   })
 })
 
+// 更新当前筛选条件或页面状态。
 function changeMonth(offset) {
   const nextMonth = new Date(
     displayedMonth.value.getFullYear(),
@@ -74,6 +79,7 @@ function changeMonth(offset) {
   displayedMonth.value = nextMonth
 }
 
+// 加载当前页面所需的数据。
 async function loadActivity() {
   activityByDay.value = {}
   try {
@@ -89,6 +95,7 @@ async function loadActivity() {
   }
 }
 
+// 选中指定的数据项。
 function selectDay(day) {
   selectedDate.value = new Date(
     displayedMonth.value.getFullYear(),
@@ -97,12 +104,14 @@ function selectDay(day) {
   )
 }
 
+// 判断当前状态是否满足条件。
 function isToday(day) {
   return displayedMonth.value.getFullYear() === now.getFullYear()
     && displayedMonth.value.getMonth() === now.getMonth()
     && day === now.getDate()
 }
 
+// 判断当前状态是否满足条件。
 function isSelected(day) {
   return selectedDate.value.getFullYear() === displayedMonth.value.getFullYear()
     && selectedDate.value.getMonth() === displayedMonth.value.getMonth()

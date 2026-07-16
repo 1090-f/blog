@@ -6,6 +6,7 @@ export const state = reactive({
   items: []
 })
 
+// 显示对应的提示信息。
 function show(type, text, duration = 2400) {
   const id = nextId++
   state.items.push({ id, type, text })

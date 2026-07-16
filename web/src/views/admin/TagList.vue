@@ -39,7 +39,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { createTag, deleteTag, getTags, updateTag } from '../../api/tag'
+import { createTag, deleteTag, getAdminTags, updateTag } from '../../api/tag'
 import { message } from '../../utils/message'
 
 const tags = ref([])
@@ -49,22 +49,25 @@ const editingId = ref(null)
 const form = ref({ name: '' })
 const saving = ref(false)
 
+// 打开对应的界面或选择器。
 function openDialog(tag) {
   editingId.value = tag?.id || null
   form.value = { name: tag?.name || '' }
   dialogVisible.value = true
 }
 
+// 加载当前页面所需的数据。
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getTags()
+    const res = await getAdminTags()
     tags.value = res.data || []
   } finally {
     loading.value = false
   }
 }
 
+// 处理用户操作或浏览器事件。
 async function handleSave() {
   if (!form.value.name.trim()) {
     message.warning('请输入标签名称')
@@ -87,6 +90,7 @@ async function handleSave() {
   }
 }
 
+// 处理用户操作或浏览器事件。
 async function handleDelete(id) {
   if (!window.confirm('确认删除这个标签吗？')) return
   try {
