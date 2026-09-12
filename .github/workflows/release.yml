@@ -1,0 +1,106 @@
+name: Release
+
+# 什么时候触发这条流水线。
+# 日常 push 走 ci.yml 只跑测试；只有打了版本 tag 才进入发布流程。
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "手动触发时是否在构建完成后执行部署"
+        type: boolean
+        default: false
+
+# 推镜像到 GHCR 需要 packages: write；拉代码需要 contents: read。
+# 这就是为什么不需要额外准备 Docker Hub 账号：用仓库自带的 GITHUB_TOKEN 就够。
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ---------- 第 1~3 步：在 GitHub 的机器上构建并推送镜像 ----------
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.sha_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 计算镜像名与 tag
+        id: meta
+        run: |
+          # GHCR 要求仓库名全小写
+          IMAGE="$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')"
+          # 核心规则：tag 用 commit sha 前 12 位。
+          # 同一个提交永远对应同一个镜像，可追溯、可回滚。
+          # 刻意不推 latest —— latest 会被覆盖，回滚时没有「上一个」可切。
+          SHA_TAG="${GITHUB_SHA::12}"
+          {
+            echo "image=${IMAGE}"
+            echo "sha_tag=${SHA_TAG}"
+            echo "tags<<EOF"
+            echo "${IMAGE}:${SHA_TAG}"
+            if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+              echo "${IMAGE}:${GITHUB_REF_NAME}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 安装 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          # 复用 Actions 缓存的构建层，第二次起构建会快很多
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------- 第 4 步：通过 SSH 让服务器执行部署脚本 ----------
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # 没配服务器时这个 job 自动跳过，构建部分照样能单独练通。
+    # 注意：GitHub 不允许在 if 里读 secrets，所以要另建一个 repository variable
+    # DEPLOY_ENABLED=true 当作开关。
+    if: ${{ vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || inputs.deploy) }}
+    steps:
+      - name: 通过 SSH 执行远程部署
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ vars.DEPLOY_PORT || 22 }}
+          # 远端脚本任一行失败就中断，避免带着错误继续往下走
+          script_stop: true
+          script: |
+            set -e
+            cd "${{ vars.DEPLOY_PATH }}"
+            # 先把部署脚本本身更新到最新，再执行
+            git fetch --tags --prune
+            git checkout main
+            git pull --ff-only
+            # 用 bash 显式调用：Windows 上提交的文件常常没有可执行位
+            bash scripts/deploy.sh "${{ needs.build-and-push.outputs.image_tag }}"
+      - name: 部署后从公网复验
+        if: ${{ vars.SITE_URL != '' }}
+        run: curl -fsS --max-time 10 "${{ vars.SITE_URL }}/health"

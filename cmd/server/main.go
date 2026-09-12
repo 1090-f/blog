@@ -34,6 +34,14 @@ func Main() {
 	if err := database.EnsureAdmin(db, cfg.AdminBootstrap); err != nil {
 		log.Fatal(err)
 	}
+	// 空站点首次启动时写入示例分类、标签和文章；已有文章时不会修改数据。
+	seeded, err := database.EnsureSampleContent(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if seeded {
+		log.Println("[init] 示例内容已创建")
+	}
 	// 创建前台服务
 	publicEngine := router.New(cfg, db)
 	// 创建后台服务

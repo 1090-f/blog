@@ -43,5 +43,25 @@ config/config.local.yaml
 config/*.local.yaml
 .env
 .env.*
+!docker/.env.example
 web/.env.local
 web/.env.*.local
+
+# 服务器上记录当前部署版本的本地状态文件
+.deploy_state
+
+# 部署专用私钥（绝不能进仓库）
+.deploy/
+
+# 数据库 dump 与上传目录备份：含真实数据、用户密码哈希，而仓库是 public。
+# 本地文件保留，只是不再被 git 跟踪。
+gin_blog.sql
+blog-uploads.tar.gz
+
+# 服务器运维手册：含服务器 IP、账户名与密钥文件名。
+# 仓库是 public，这份文档只留在本地，不要提交。
+docs/server-ssh-keys.md
+
+# 工作区记忆文件：含服务器 IP、账号、运维细节。
+# 同样不要提交到公开仓库。
+.workbuddy/

@@ -1,0 +1,108 @@
+# 生产编排：镜像来自 CI 构建并推送到 GHCR 的产物，服务器上不编译任何代码。
+#
+# 用法（IMAGE_TAG 必填，由 scripts/deploy.sh 传入 commit sha）：
+#   IMAGE_TAG=abc123def456 docker compose --env-file docker/.env -f docker/compose.prod.yaml up -d
+#
+# 和 docker/compose.yaml 的四处区别：
+#   1. app 用 image 而不是 build —— 服务器不需要 Go / Node，也不需要源码
+#   2. 端口只绑 127.0.0.1 —— 对外由反向代理提供 HTTPS，数据库和后台端口不直接暴露
+#   3. app 增加健康检查 —— CI/CD 靠它判定这次发布成功还是失败
+#   4. 日志加轮转上限、容器加资源上限 —— 否则日志和内存会慢慢把机器吃光
+#
+# 资源上限按目标机器标定：1.6G 内存的 ECS（上面还跑着 Memora 的 PostgreSQL）。
+# 换到更大的机器时可以放宽，但 MySQL 的 innodb_buffer_pool_size 要跟着一起调。
+
+services:
+  app:
+    # 故意不带默认值：忘了传 IMAGE_TAG 直接报错，好过悄悄部署一个不存在的版本
+    image: ghcr.io/1090-f/blog:${IMAGE_TAG:?IMAGE_TAG 未设置，请通过 deploy.sh 传入 commit sha}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BLOG_DATABASE_HOST: db
+      BLOG_DATABASE_PORT: "3306"
+      BLOG_DATABASE_USER: ${MYSQL_USER}
+      BLOG_DATABASE_PASS: ${MYSQL_PASSWORD}
+      BLOG_DATABASE_NAME: ${MYSQL_DATABASE}
+      BLOG_JWT_SECRET: ${BLOG_JWT_SECRET}
+      BLOG_JWT_EXPIRE: ${BLOG_JWT_EXPIRE:-7200}
+      BLOG_UPLOAD_DIR: /app/uploads
+      BLOG_UPLOAD_URL: /uploads
+      BLOG_UPLOAD_MAX_SIZE_BYTES: ${BLOG_UPLOAD_MAX_SIZE_BYTES:-5242880}
+      # 默认关闭：只有在首次创建管理员时才在 .env 里临时打开
+      BLOG_ADMIN_BOOTSTRAP_ENABLED: ${BLOG_ADMIN_BOOTSTRAP_ENABLED:-false}
+      BLOG_ADMIN_BOOTSTRAP_USERNAME: ${BLOG_ADMIN_BOOTSTRAP_USERNAME:-}
+      BLOG_ADMIN_BOOTSTRAP_PASSWORD: ${BLOG_ADMIN_BOOTSTRAP_PASSWORD:-}
+      BLOG_ADMIN_BOOTSTRAP_NICKNAME: ${BLOG_ADMIN_BOOTSTRAP_NICKNAME:-}
+    ports:
+      # 只绑回环地址：反向代理在同一台机器上转发，公网扫不到这两个端口
+      - "127.0.0.1:${PUBLIC_PORT:-8080}:8080"
+      - "127.0.0.1:${ADMIN_PORT:-8081}:8081"
+    volumes:
+      - app_uploads:/app/uploads
+    healthcheck:
+      # 用容器自带的 busybox wget 探应用自己的 /health，不依赖宿主机装 curl
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          # Go 静态二进制的常驻内存很小，256M 留了足够余量
+          memory: 256M
+          cpus: "1.0"
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    # 小内存机器必须显式收窄 MySQL 的默认开销，否则会被 OOM Killer 杀掉。
+    # performance_schema 关掉能省下上百 MB，buffer pool 128M 对博客量级足够。
+    command:
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF
+      - --max-connections=30
+      - --table-open-cache=200
+      - --innodb-log-buffer-size=8M
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --innodb-flush-method=O_DIRECT
+      - --skip-name-resolve
+      - --skip-log-bin
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 640M
+          cpus: "1.0"
+
+volumes:
+  # 这两个卷和 compose.yaml 里的同名，所以本地开发的数据能直接被生产编排复用，
+  # 反之亦然。真正上线前请确认这是你想要的行为。
+  app_uploads:
+  mysql_data:

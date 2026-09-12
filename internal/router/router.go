@@ -58,6 +58,7 @@ func registerPublicServerRoutes(engine *gin.Engine, cfg config.Config, db *gorm.
 	registerPublicAuthRoutes(api, authController)
 	registerPublicRoutes(api, cfg, categoryController, tagController, articleController, commentController, siteStatsController, activityController, userDAO)
 	registerUserRoutes(api, cfg, authController, commentController, userDAO)
+	// 静态资源
 	registerServerAssets(engine, cfg, false)
 }
 
@@ -110,7 +111,7 @@ func registerServerAssets(engine *gin.Engine, cfg config.Config, adminServer boo
 	if _, err := os.Stat(distDir); err != nil {
 		return
 	}
-
+	// 注册前端资源
 	engine.Static("/assets", filepath.Join(distDir, "assets"))
 	engine.StaticFile("/favicon.ico", filepath.Join(distDir, "favicon.ico"))
 	engine.StaticFile("/favicon.svg", filepath.Join(distDir, "favicon.svg"))
@@ -119,9 +120,8 @@ func registerServerAssets(engine *gin.Engine, cfg config.Config, adminServer boo
 	engine.StaticFile("/blog-background.jpg", filepath.Join(distDir, "blog-background.jpg"))
 	engine.StaticFile("/blog-background-wide.jpg", filepath.Join(distDir, "blog-background-wide.jpg"))
 	engine.StaticFile("/blog-background-top.png", filepath.Join(distDir, "blog-background-top.png"))
-	engine.StaticFile("/shorekeeper-chibi.png", filepath.Join(distDir, "shorekeeper-chibi.png"))
-	engine.StaticFile("/shorekeeper-chibi-source.png", filepath.Join(distDir, "shorekeeper-chibi-source.png"))
-
+	engine.Static("/pets", filepath.Join(distDir, "pets"))
+	// 处理前面没有匹配到的请求
 	engine.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
 		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/uploads") {
