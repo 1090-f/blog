@@ -13,15 +13,18 @@ on:
         type: boolean
         default: false
 
-# 推镜像到 GHCR 需要 packages: write；拉代码需要 contents: read。
-# 这就是为什么不需要额外准备 Docker Hub 账号：用仓库自带的 GITHUB_TOKEN 就够。
+# 镜像推到阿里云 ACR，凭据来自两个仓库 Secret（ACR_USERNAME / ACR_PASSWORD）。
+# 不再需要 packages: write —— 那是「用 GITHUB_TOKEN 推 GHCR」才要的权限。
 permissions:
   contents: read
-  packages: write
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # 为什么不用 GHCR：这台 ECS 在国内，直连 ghcr.io 实测只有 40~50 KB/s，
+  # 17MB 的应用镜像要拉 6~8 分钟，还会把 SSH 部署步骤顶到超时。
+  # ACR 同在国内，同一份镜像 1 秒内拉完。
+  REGISTRY: crpi-lxhi919p6atrn34g.cn-hangzhou.personal.cr.aliyuncs.com
+  # <命名空间>/<仓库名>。仓库类型必须是「公开」，否则服务器没登录就拉不动。
+  IMAGE_NAME: fddz/blog
 
 jobs:
   # ---------- 第 1~3 步：在 GitHub 的机器上构建并推送镜像 ----------
@@ -36,7 +39,7 @@ jobs:
       - name: 计算镜像名与 tag
         id: meta
         run: |
-          # GHCR 要求仓库名全小写
+          # 镜像仓库要求仓库名全小写（ACR 与 GHCR 都是）
           IMAGE="$(echo "${REGISTRY}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')"
           # 核心规则：tag 用 commit sha 前 12 位。
           # 同一个提交永远对应同一个镜像，可追溯、可回滚。
@@ -56,12 +59,14 @@ jobs:
       - name: 安装 Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 登录 GHCR
+      - name: 登录阿里云 ACR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # 登录名 = 阿里云账号名，在 ACR 控制台「访问凭证」页能看到
+          username: ${{ secrets.ACR_USERNAME }}
+          # 固定密码。临时密码只有 1 小时有效期，放进 CI 每次都要换，不现实。
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: 构建并推送镜像
         uses: docker/build-push-action@v6
@@ -90,11 +95,12 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ vars.DEPLOY_PORT || 22 }}
-          # 默认只有 10 分钟，实测不够：服务器在国内，ghcr.io 直连约 40~50 KB/s，
-          # 拉 17MB 的应用镜像就要 6~8 分钟，首部署还要拉 800MB 的 mysql:8.0。
-          # 超时的表现具有欺骗性——SSH 会话被杀，远端脚本静默中断，
-          # 看起来像「部署没做任何事」，实际是拉到一半被掐了。
-          command_timeout: 30m
+          # 默认只有 10 分钟。改用 ACR 后正常耗时不到 3 分钟
+          # （拉镜像 1 秒 + 重建容器 + 健康检查最多 60 秒），15 分钟有 5 倍余量。
+          # 不设更宽是因为超时失败极难排查：SSH 会话被杀后远端脚本静默中断，
+          # 服务器上既没有 .deploy_state 也没有容器，看起来像「部署根本没执行」。
+          # （v0.1.1 就是这么失败的 —— 当时上游是 ghcr.io，步骤耗时 10.1 分钟撞线。）
+          command_timeout: 15m
           # 远端脚本任一行失败就中断，避免带着错误继续往下走
           script_stop: true
           script: |

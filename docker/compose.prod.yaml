@@ -1,4 +1,4 @@
-# 生产编排：镜像来自 CI 构建并推送到 GHCR 的产物，服务器上不编译任何代码。
+# 生产编排：镜像来自 CI 构建并推送到阿里云 ACR 的产物，服务器上不编译任何代码。
 #
 # 用法（IMAGE_TAG 必填，由 scripts/deploy.sh 传入 commit sha）：
 #   IMAGE_TAG=abc123def456 docker compose --env-file docker/.env -f docker/compose.prod.yaml up -d
@@ -14,8 +14,11 @@
 
 services:
   app:
-    # 故意不带默认值：忘了传 IMAGE_TAG 直接报错，好过悄悄部署一个不存在的版本
-    image: ghcr.io/1090-f/blog:${IMAGE_TAG:?IMAGE_TAG 未设置，请通过 deploy.sh 传入 commit sha}
+    # 故意不带默认值：忘了传 IMAGE_TAG 直接报错，好过悄悄部署一个不存在的版本。
+    # 用阿里云 ACR 而不是 GHCR：服务器在武汉、镜像在杭州，跨地域公网实测 25MB/s；
+    # 换回 ghcr.io 会掉到 40~50KB/s，每次部署白等 6~8 分钟。
+    # 仓库类型是「公开」，所以服务器不需要 docker login，匿名就能拉。
+    image: crpi-lxhi919p6atrn34g.cn-hangzhou.personal.cr.aliyuncs.com/fddz/blog:${IMAGE_TAG:?IMAGE_TAG 未设置，请通过 deploy.sh 传入 commit sha}
     restart: unless-stopped
     depends_on:
       db:
