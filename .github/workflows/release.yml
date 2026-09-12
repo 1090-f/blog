@@ -90,6 +90,11 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ vars.DEPLOY_PORT || 22 }}
+          # 默认只有 10 分钟，实测不够：服务器在国内，ghcr.io 直连约 40~50 KB/s，
+          # 拉 17MB 的应用镜像就要 6~8 分钟，首部署还要拉 800MB 的 mysql:8.0。
+          # 超时的表现具有欺骗性——SSH 会话被杀，远端脚本静默中断，
+          # 看起来像「部署没做任何事」，实际是拉到一半被掐了。
+          command_timeout: 30m
           # 远端脚本任一行失败就中断，避免带着错误继续往下走
           script_stop: true
           script: |
