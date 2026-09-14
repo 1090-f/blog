@@ -75,6 +75,14 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          # 关掉 buildx 默认附加的 provenance / SBOM 证明清单。
+          # 它们不是镜像内容，而是 buildx 以 application/vnd.oci.empty.v1+json
+          # 为 config 额外推的一个 platform=unknown/unknown 的 manifest；ACR 不认识
+          # 这种 manifest，直接拒绝整个 push：
+          #   denied: unknown manifest class for application/vnd.oci.empty.v1+json
+          # （GHCR 接受它，所以索引里会多出一条 unknown/unknown —— 之前那份镜像就有。）
+          provenance: false
+          sbom: false
           # 复用 Actions 缓存的构建层，第二次起构建会快很多
           cache-from: type=gha
           cache-to: type=gha,mode=max
