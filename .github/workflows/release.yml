@@ -109,8 +109,10 @@ jobs:
           # 服务器上既没有 .deploy_state 也没有容器，看起来像「部署根本没执行」。
           # （v0.1.1 就是这么失败的 —— 当时上游是 ghcr.io，步骤耗时 10.1 分钟撞线。）
           command_timeout: 15m
-          # 远端脚本任一行失败就中断，避免带着错误继续往下走
-          script_stop: true
+          # 注意：这里不要写 script_stop: true。
+          # appleboy/ssh-action v1 已经删掉了这个输入（写了会报
+          # "Unexpected input(s) 'script_stop'"），改为由脚本自己负责 ——
+          # 下面脚本第一行就是 set -e，效果等价且不依赖 action 的版本行为。
           script: |
             set -e
             cd "${{ vars.DEPLOY_PATH }}"
