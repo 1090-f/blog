@@ -30,4 +30,9 @@ COPY --from=backend-builder /src/web/dist ./web/dist
 
 USER app
 EXPOSE 8080 8081
-ENTRYPOINT ["./blog"]
+
+# 【演练用，必须改回】故意让容器「起得来但不健康」：
+# ENTRYPOINT ["sleep", "infinity"] 会让容器一直运行，但永远不会监听 8080，
+# 所以 compose 的健康检查和 deploy.sh 的 /health 轮询都会失败。
+# 用它来验证 deploy.sh 的自动回滚分支（这一段代码平时永远不会被执行到）。
+ENTRYPOINT ["sleep", "infinity"]
