@@ -312,6 +312,7 @@ curl -fsS http://127.0.0.1/health             # 经过代理，验证转发链�
 | 部署绿了但页面打不开 | nginx 没起来，或安全组没放行 80 | `docker ps` 看 nginx；对照 §8 检查安全组 |
 | **每次发版后页面 502，等一会儿又好了** | nginx 记住了 app 容器的**旧 IP**（容器重建后 IP 会变） | 确认 `blog-location.conf` 里用的是 `set $blog_upstream` + `resolver`，不是写死的 `upstream` 块 |
 | 上传图片报 413 | nginx 的 `client_max_body_size` 小于应用上限 | 调大（现为 10m，应用上限 5MiB） |
+| 静态资源没被压缩 | `gzip_types` 少了 `text/javascript` | 这个应用的 `.js` 返回 `text/javascript`（Go 1.20 起 MIME 改了），只写 `application/javascript` 压不到任何 JS。判据：响应头无 `Content-Encoding: gzip` 且 `Content-Length` 等于原始大小 |
 | 改了配置文件但没生效 | 只改了文件、没 reload；或改的是 `https.conf.example` | `docker exec docker-nginx-1 nginx -s reload`；`.example` 后缀不会被加载 |
 
 ---
