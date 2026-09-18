@@ -3,11 +3,12 @@
 # 用法（IMAGE_TAG 必填，由 scripts/deploy.sh 传入 commit sha）：
 #   IMAGE_TAG=abc123def456 docker compose --env-file docker/.env -f docker/compose.prod.yaml up -d
 #
-# 和 docker/compose.yaml 的四处区别：
+# 和 docker/compose.yaml 的五处区别：
 #   1. app 用 image 而不是 build —— 服务器不需要 Go / Node，也不需要源码
 #   2. 端口只绑 127.0.0.1 —— 对外由反向代理提供 HTTPS，数据库和后台端口不直接暴露
 #   3. app 增加健康检查 —— CI/CD 靠它判定这次发布成功还是失败
 #   4. 日志加轮转上限、容器加资源上限 —— 否则日志和内存会慢慢把机器吃光
+#   5. 多一个 nginx 服务作为唯一对外入口 —— 本地开发直接访问 app，不需要它
 #
 # 资源上限按目标机器标定：1.6G 内存的 ECS（上面还跑着 Memora 的 PostgreSQL）。
 # 换到更大的机器时可以放宽，但 MySQL 的 innodb_buffer_pool_size 要跟着一起调。
@@ -103,6 +104,44 @@ services:
         limits:
           memory: 640M
           cpus: "1.0"
+
+  # 唯一对外暴露的服务。app 依然只监听 127.0.0.1，公网只能通过这里进来。
+  #
+  # 为什么不参与发布流程：scripts/deploy.sh 只执行 `compose pull app` + `compose up -d app`，
+  # 代理容器不会被重建，所以发版不会中断已建立的连接，也不会丢掉 TLS 会话。
+  # 也就是说改代理配置要单独 reload（见下方注释里的命令）。
+  nginx:
+    # 固定次版本号，避免哪天 latest 跟着上游换了大版本、配置语法突然不兼容。
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      # 反向代理启动时不会去解析上游（配置里用的是变量 + resolver），
+      # 但等 app 健康再起更符合直觉，也避免启动瞬间必然出现的 502。
+      app:
+        condition: service_healthy
+    ports:
+      # 这两个是唯一映射到公网的端口。安全组也要对应放行，否则外面照样进不来。
+      - "80:80"
+      # 443 先占位：备案通过后启用 https.conf 即可，不用改编排、不用重启容器。
+      - "443:443"
+    volumes:
+      # 配置全部只读挂进来 —— 容器里的改动重启就没了，配置的唯一来源是仓库。
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      # acme.sh 的 HTTP-01 校验文件写在这个目录，所以这个挂载必须可写。
+      - ./nginx/acme:/var/www/acme
+    deploy:
+      resources:
+        limits:
+          # nginx 常驻很小，96M 是给大量并发连接时的缓冲留的余量
+          memory: 96M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   # 这两个卷和 compose.yaml 里的同名，所以本地开发的数据能直接被生产编排复用，

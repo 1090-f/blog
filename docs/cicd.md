@@ -279,7 +279,8 @@ curl -fsS http://127.0.0.1:8080/health   # 服务依然是好的
 | `pull` 报 denied / 401 | 仓库是私有的，或根本不存在 | 在 ACR 控制台确认仓库类型是「公开」且名称拼写一致 |
 | 容器反复重启 | 环境变量缺失、连不上数据库 | `docker compose -f docker/compose.prod.yaml logs app` |
 | 健康检查一直不过 | 应用启动慢，或 `/health` 依赖没就绪 | 调大 `start_period` 和脚本里的等待次数 |
-| 部署绿了但页面打不开 | 反向代理没配 | 检查 Nginx / Caddy 的 upstream 是否指向 `127.0.0.1:8080` |
+| 部署绿了但页面打不开 | nginx 没起来，或安全组没放行 80 | `docker ps` 看 `docker-nginx-1`；再查云安全组入方向 |
+| 每次发版后 502 | nginx 缓存了 app 容器的旧 IP | 反代必须用变量 + `resolver`，不能用写死的 `upstream`（详见 `deployment-pipeline.md` §8.3） |
 
 常用命令：
 
@@ -333,7 +334,7 @@ docker compose --env-file docker/.env -f docker/compose.prod.yaml images
 
 ## 七、还没做的部分（知道边界在哪）
 
-- **反向代理与 HTTPS**：目前对外只到 `127.0.0.1:8080`，需要前面加 Caddy 或 Nginx 提供 443
+- **HTTPS 与域名**：反向代理已就位（nginx，见 `deployment-pipeline.md` §8），但域名备案没下来，所以现在是 **IP + HTTP**；`https.conf.example` 与 `certs/` 都已备好，备案后改名即可
 - **数据库迁移**：`migrations/init.sql` 还没有自动执行的时机，发布流程里也没接迁移步骤
 - **备份**：还没有 mysqldump 定时任务和异地存放
 - **多副本滚动发布**：现在是单实例重建，有秒级空窗

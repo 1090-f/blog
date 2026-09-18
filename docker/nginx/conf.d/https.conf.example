@@ -1,0 +1,41 @@
+# 备案通过后启用这个文件：
+#   1. 改掉下面的 server_name，并确认 nginx/certs/ 下已有 fullchain.pem 和 privkey.pem
+#   2. mv https.conf.example https.conf
+#   3. docker exec docker-nginx-1 nginx -s reload
+#
+# 现在不会被加载 —— nginx 只 include conf.d/*.conf，.example 后缀不匹配这个通配。
+# 这样写而不是「把内容注释掉」，是为了启用时不用逐行检查注释有没有漏删。
+#
+# ⚠️ 启用前证书必须已经在位，否则 nginx -t 会直接报 certificate not found、容器起不来。
+
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    # nginx 1.25.1 起 http2 是独立指令，不再写在 listen 后面（老写法会告警）
+    http2       on;
+
+    server_name blog.example.com;    # ← 换成你的域名
+
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+    ssl_protocols             TLSv1.2 TLSv1.3;
+    ssl_session_cache         shared:BlogTLS:2m;
+    ssl_session_timeout       1h;
+    # 没开 OCSP stapling：Let's Encrypt 已在 2025 年停止提供 OCSP 响应，
+    # 开了也只是白等一个查不到结果的请求。
+    # 没开 HSTS：等确认全站 HTTPS 稳定后再加，加早了且出问题会给访客留很长时间的麻烦。
+
+    client_max_body_size 10m;
+
+    # 续期校验走的是 http://，那段逻辑留在 blog.conf 的 :80 站点里，这里不需要重复。
+    include /etc/nginx/snippets/blog-location.conf;
+
+    gzip             on;
+    gzip_min_length  1024;
+    gzip_comp_level  5;
+    gzip_vary        on;
+    gzip_proxied     any;
+    gzip_types       text/plain text/css text/xml application/json application/javascript
+                     application/xml application/rss+xml image/svg+xml;
+}

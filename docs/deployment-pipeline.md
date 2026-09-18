@@ -63,7 +63,10 @@ git tag v0.1.6 && git push origin v0.1.6
 | `.github/workflows/release.yml` | 发布流水线本体：构建 + 部署两个 job | tag 推送时 |
 | `.github/workflows/ci.yml` | 日常 CI：`go test ./...`、`npm run lint/build` | 每次 push / PR |
 | `docker/Dockerfile` | 三阶段构建：前端 `npm run build` → 后端 `go build` → alpine 运行 | job 1 在 runner 上执行 |
-| `docker/compose.prod.yaml` | 生产编排：app 用**镜像**（不 build）、端口只绑 `127.0.0.1`、带 healthcheck 与资源上限 | 服务器上执行 |
+| `docker/compose.prod.yaml` | 生产编排：app 用**镜像**（不 build）、端口只绑 `127.0.0.1`、带 healthcheck 与资源上限、另有对外入口 nginx | 服务器上执行 |
+| `docker/nginx/conf.d/blog.conf` | 反向代理站点（当前 HTTP / 80）；同目录的 `https.conf.example` 是备案后改名启用的 HTTPS 站点 | nginx 容器启动或 `nginx -s reload` |
+| `docker/nginx/snippets/blog-location.conf` | 反代与压缩的公共片段，80 与 443 两个站点共用一份 | 同上 |
+| `docker/nginx/certs/` | 证书目录，只读挂进容器；同目录 `.gitignore` 挡住私钥入库 | acme.sh 写入时 |
 | `scripts/deploy.sh` | 服务器侧部署脚本：拉镜像 → 重建容器 → 健康检查 → 失败回滚 | 由 SSH 调用 |
 | `docker/.env` | 服务器本地配置（数据库密码、JWT 密钥等），权限 600，**不进 git** | 容器创建时注入环境变量 |
 | `.deploy_state` | 服务器上的单行文件，记录**当前线上真的跑起来的** sha | 每次部署成功/回滚时读 |
@@ -254,12 +257,18 @@ cd /srv/blog && bash scripts/deploy.sh --status
 docker images | grep crpi-                 # 先看本地有哪些版本
 bash scripts/deploy.sh <上一个 sha12>
 
+# —— 改了反向代理配置之后 ——
+docker exec docker-nginx-1 nginx -t          # 先验语法，别直接 reload
+docker exec docker-nginx-1 nginx -s reload   # 热加载：不断连接、不重启容器
+
 # —— 看日志 ——
 docker compose --env-file docker/.env -f docker/compose.prod.yaml ps
 docker compose --env-file docker/.env -f docker/compose.prod.yaml logs -f app
+docker compose --env-file docker/.env -f docker/compose.prod.yaml logs -f nginx
 
 # —— 直接问服务 ——
-curl -fsS http://127.0.0.1:8080/health
+curl -fsS http://127.0.0.1:8080/health        # 绕过代理，直连应用
+curl -fsS http://127.0.0.1/health             # 经过代理，验证转发链路
 ```
 
 ---
@@ -300,18 +309,106 @@ curl -fsS http://127.0.0.1:8080/health
 | `compose pull` 报 401/denied | ACR 仓库是私有的，服务器没登录 | 控制台把仓库类型改成「公开」，或给服务器配 docker login |
 | 容器反复重启 | 环境变量缺失、连不上数据库 | `docker compose ... logs app` |
 | 健康检查一直不过 | 应用启动慢 / 依赖没就绪 | 调大 `start_period` 与 `wait_health` 次数 |
-| 部署绿了但页面打不开 | 反向代理没配 | 反向代理 upstream 指向 `127.0.0.1:8080` |
+| 部署绿了但页面打不开 | nginx 没起来，或安全组没放行 80 | `docker ps` 看 nginx；对照 §8 检查安全组 |
+| **每次发版后页面 502，等一会儿又好了** | nginx 记住了 app 容器的**旧 IP**（容器重建后 IP 会变） | 确认 `blog-location.conf` 里用的是 `set $blog_upstream` + `resolver`，不是写死的 `upstream` 块 |
+| 上传图片报 413 | nginx 的 `client_max_body_size` 小于应用上限 | 调大（现为 10m，应用上限 5MiB） |
+| 改了配置文件但没生效 | 只改了文件、没 reload；或改的是 `https.conf.example` | `docker exec docker-nginx-1 nginx -s reload`；`.example` 后缀不会被加载 |
 
 ---
 
-## 8. 设计取舍与已知边界
+## 8. 公网入口（反向代理）
+
+只有 `nginx` 容器映射到公网，其余端口全部留在回环地址上：
+
+| 服务 | 监听 | 谁能访问 |
+|---|---|---|
+| nginx | `0.0.0.0:80`（`443` 已占位） | 公网（还需云安全组放行） |
+| app 前台 | `127.0.0.1:8080` | 只有宿主机和 nginx |
+| app 后台 | `127.0.0.1:8081` | 只有宿主机 —— **不要**暴露，纯 HTTP 下登录凭据是明文 |
+| db | 容器网络内 `3306` | 只有 app |
+
+> 后台为什么不做成 `/admin` 这样的路径反代：前台和后台是**两个独立的 Gin 引擎**，各自在**根路径**托管自己的 SPA，只靠 `/runtime-config.js` 区分模式。两套前端的 `/`、`/assets` 会直接撞车，所以后台只能走独立端口。要访问就用 SSH 隧道。
+
+### 8.1 首次启用
+
+服务器上：
+
+```bash
+cd /srv/blog && git pull
+docker compose --env-file docker/.env -f docker/compose.prod.yaml up -d nginx
+docker exec docker-nginx-1 nginx -t          # 语法自检
+curl -fsS http://127.0.0.1/health            # 经代理访问，应返回 {"code":0,...}
+```
+
+然后在阿里云控制台放行入方向 `TCP 80/80`（要 HTTPS 再加 `443/443`），授权对象 `0.0.0.0/0`。
+`firewalld` 是 inactive 状态，所以**唯一**的网络闸门是云安全组。
+
+⚠️ 别顺手把 8080 / 8081 / 3306 一起开出去——它们只在 `127.0.0.1` 监听是有意设计。
+
+### 8.2 为什么 nginx 不参与发布流程
+
+`deploy.sh` 只执行 `compose pull app` + `compose up -d app`，不碰 nginx。好处是发版不会重建代理、不会中断已建立的连接，也不会丢掉 TLS 会话。代价是**改了代理配置要单独 reload**（见 §5）。
+
+### 8.3 "发版后 502" 这个坑（本配置已经绕过）
+
+app 容器每次部署都会被重建，**容器 IP 会变**。如果 nginx 里写的是
+
+```nginx
+upstream blog_app { server app:8080; }   # 反面例子
+```
+
+它只在启动时解析一次域名，之后一直连那个已经不存在的 IP —— 表现就是"每次发版后页面 502，过一会儿又莫名好了"。
+
+所以 `blog-location.conf` 用的是变量 + Docker 内置 DNS：
+
+```nginx
+set $blog_upstream app:8080;
+proxy_pass http://$blog_upstream;
+resolver 127.0.0.11 valid=10s ipv6=off;
+```
+
+用变量时 nginx 不再在启动阶段解析域名，而是按 `valid=10s` 定期重新解析，容器换 IP 后最多 10 秒自动跟上。
+
+### 8.4 备案通过后切到域名 + HTTPS
+
+阿里云按 HTTP 请求头里的**域名**判断备案，纯 IP 访问不触发校验——所以现在按 IP 是能用的。域名一旦解析到大陆节点并在 80/443 上提供服务，就会被打回。
+
+备案下来后按这个顺序做（**不改 compose、不重新发布**）：
+
+```bash
+# 1) 签发证书并装到 nginx/certs/（acme.sh 装在家目录，不需要 root）
+curl https://get.acme.sh | sh -s email=<你的邮箱>
+~/.acme.sh/acme.sh --issue -d <你的域名> -w /srv/blog/docker/nginx/acme
+~/.acme.sh/acme.sh --install-cert -d <你的域名> \
+  --key-file       /srv/blog/docker/nginx/certs/privkey.pem \
+  --fullchain-file /srv/blog/docker/nginx/certs/fullchain.pem \
+  --reloadcmd      "docker exec docker-nginx-1 nginx -s reload"
+
+# 2) 启用 443 站点，把里面的 server_name 改成你的域名
+cd /srv/blog/docker/nginx/conf.d && mv https.conf.example https.conf
+
+# 3) 把 blog.conf 里的 :80 改成只做 301 跳转（保留 ACME 例外）
+docker exec docker-nginx-1 nginx -s reload
+```
+
+**顺序不能颠倒**：签发证书时走的是 `http://<域名>/.well-known/acme-challenge/`，如果这时 :80 已经全量跳转 HTTPS，校验就取不到文件、签发必然失败。所以先签、再启用 443、最后才把 :80 改成跳转。
+
+`--install-cert` 会在 `~/.acme.sh/` 里留下自动续期任务（acme.sh 自己装的 cron），续期后通过 `--reloadcmd` 让 nginx 重新读取证书，不需要额外写定时脚本。
+
+> 443 端口在 compose 里**一开始就发布了**，就是为了让这一步不需要动编排、不需要重启容器。
+
+---
+
+## 9. 设计取舍与已知边界
 
 **为什么这样设计**
 
 - **镜像 tag 用 commit sha** —— 可追溯、可回滚；`latest` 会被覆盖，等于没有"上一个版本"。
 - **构建与运行分离** —— 服务器只装 Docker，攻击面和运维成本都小；换机器时不用装 Go/Node 工具链。
 - **健康检查后才认账** —— "发布成功"的定义是应用真的能响应，而不是容器启动了。
-- **端口只绑 `127.0.0.1`** —— 应用与数据库都不直接暴露公网，由同机反向代理提供 HTTPS。
+- **端口只绑 `127.0.0.1`** —— 应用与数据库都不直接暴露公网，对外统一走 nginx（§8）。
+- **反向代理用 nginx 而不是 Caddy** —— Caddy 的自动 HTTPS 确实更省事，但 nginx 的配置知识是通用技能、资料和排错答案也远多于 Caddy。证书这一步用 acme.sh 补上，多花的只是一个续期任务（§8.4）。
+- **代理不参与发布流程** —— 发版只重建 app，代理保持不动，避免"改一次代码顺手把入口也重启了"。
 
 **回滚的边界（要理解，别期待它万能）**
 
@@ -322,7 +419,7 @@ curl -fsS http://127.0.0.1:8080/health
 
 **还没做的部分**
 
-- 反向代理与 HTTPS 尚未配置，目前对外只到 `127.0.0.1:8080`
+- 域名备案未完成，所以公网入口目前是 **IP + HTTP**；HTTPS 的配置与证书目录已就位（`https.conf.example` + `certs/`），只等备案（§8.4）
 - 数据库迁移脚本（`migrations/init.sql`）没有接入发布流程
 - 没有数据库 / 上传目录的定时备份
 - 单实例重建，发布时有秒级空窗，没有滚动发布

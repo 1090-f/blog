@@ -1,0 +1,2 @@
+acme.sh 的 HTTP-01 校验文件会临时落在这个目录，容器内以 /var/www/acme 只读暴露给 nginx。
+这个占位文件的作用只是让空目录能进 git。
