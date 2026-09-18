@@ -201,4 +201,5 @@ GitHub Actions 会在推送和拉取请求中执行上述后端测试、前端 l
 - [本地运行说明](docs/setup.md)
 - [配置说明](docs/configuration.md)
 - [部署检查清单](docs/deployment.md)
+- [CI/CD 自动化部署](docs/deployment-pipeline.md)
 - [API 文档](docs/api.md)

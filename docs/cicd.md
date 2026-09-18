@@ -128,8 +128,10 @@ DNS 直接解析不了（`curl` 返回 `HTTP 000`、`connect=0s`），而报错�
 - **必须用「固定密码」，不能用「临时密码」。** 临时密码有效期只有 1 小时，放进 CI 等于每次流水线
   都得先换一次口令。固定密码在「访问凭证」页点「设置固定密码」生成。
   ⚠️ 它**存进去之后再也读不回来**，只能重置 —— 生成后立刻存进密码管理器。
-- **登录名是「阿里云账号名」**（本例 `nick9452434164`），不是邮箱也不是 AccessKey。
+- **登录名是「阿里云账号名」**，不是邮箱也不是 AccessKey。
   控制台「访问凭证」页会直接给一条填好用户名的 `docker login` 命令，照着抄就行。
+  ⚠️ 这个账号名不要写进任何会提交到 public 仓库的文档里（本文件此前就写过，已移除）——
+  它是阿里云控制台的登录凭据之一。
 - **留意「自动创建仓库」的默认类型。** 如果命名空间开着自动创建、且默认配置是「私有」，
   push 一个不存在的仓库名会自动建出一个**私有**仓库 —— 服务器随后匿名拉取就会失败。
   **稳妥做法是手工创建仓库、类型显式选「公开」**，别依赖自动创建。
@@ -184,7 +186,7 @@ docker manifest inspect $REG/fddz/blog:<sha12> && echo "匿名可拉"
 | `DEPLOY_HOST` | Secret | 服务器 IP 或域名 |
 | `DEPLOY_USER` | Secret | `deploy` |
 | `DEPLOY_SSH_KEY` | Secret | 上一步 `cat` 出来的私钥全文，含 `BEGIN` / `END` 两行 |
-| `ACR_USERNAME` | Secret | 阿里云账号名（本例 `nick9452434164`），ACR「访问凭证」页可查 |
+| `ACR_USERNAME` | Secret | 阿里云账号名，ACR「访问凭证」页可查 |
 | `ACR_PASSWORD` | Secret | ACR 的**固定密码**（不是阿里云登录密码，也不是 AccessKey） |
 | `DEPLOY_ENABLED` | Variable | `true`（不配就只构建、不部署） |
 | `DEPLOY_PORT` | Variable | `22` |

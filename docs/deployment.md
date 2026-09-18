@@ -96,7 +96,7 @@ BLOG_ADMIN_BOOTSTRAP_NICKNAME=管理员
 - 定期轮换 JWT 密钥和数据库密码；轮换 JWT 密钥会使现有登录令牌失效。
 - 为上传目录设置容量监控和备份策略。
 
-## CI
+## CI/CD
 
 [GitHub Actions 工作流](../.github/workflows/ci.yml) 会在推送与拉取请求中执行：
 
@@ -104,3 +104,7 @@ BLOG_ADMIN_BOOTSTRAP_NICKNAME=管理员
 - `npm ci`
 - `npm run lint`
 - `npm run build`
+
+打版本 tag（`v*.*.*`）会触发[发布流水线](../.github/workflows/release.yml)：构建镜像推到镜像仓库，
+再通过 SSH 让服务器换版本，健康检查失败时自动回滚。
+完整步骤、验收方法与排错见 **[CI/CD 自动化部署](deployment-pipeline.md)**。
