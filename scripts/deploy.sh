@@ -7,7 +7,9 @@
 #   bash scripts/deploy.sh <image_tag>   部署指定版本（tag 是 commit sha 前 12 位）
 #   bash scripts/deploy.sh --status      查看当前版本与容器状态
 #
-# 做的事：拉新镜像 -> 重建 app 容器 -> 轮询 /health -> 失败则切回上一个版本。
+# 做的事：拉新镜像 -> 重建 app 容器 -> 轮询 /health
+#         -> 失败则切回上一个版本
+#         -> 成功则热加载反向代理配置（让 nginx 配置文件的改动也随发布生效）
 
 set -euo pipefail
 
@@ -49,6 +51,46 @@ wait_health() {
   return 1
 }
 
+# 反向代理的热加载。
+#
+# 为什么需要：反代的配置放在挂载进容器的文件里，改文件并不会让运行中的 nginx 读新内容
+# ——`compose up -d app` 不会重建代理容器，所以「改了 nginx 配置但线上没变化」是个
+# 很容易踩的坑。这里把「配置生效」也纳入发布流程，就不用再靠人记得手动 reload。
+#
+# 用容器 ID 而不是容器名：容器名由 compose 项目名（目录名）决定，换目录就变了。
+#
+# `|| true` 不能省：compose 文件里没有 nginx 服务时这条命令会报错退出，
+# 而 set -e 下「只含命令替换的赋值」失败会直接终止整个脚本
+# （表现为部署莫名其妙中断、且没有任何日志）。这里让它永远返回 0，由调用方判空。
+nginx_cid() {
+  compose ps -q nginx 2>/dev/null | head -n1 || true
+}
+
+# 只在发布成功时热加载：失败并回滚时，代理应该继续用上一个已知可用的配置，
+# 而不是把一批「和新版本配套、但和新版本一起被否掉了」的配置加载上来。
+reload_proxy() {
+  local cid
+  cid="$(nginx_cid)"
+  if [ -z "$cid" ]; then
+    log "未发现 nginx 容器（可能还没首次启用），跳过反向代理热加载"
+    return 0
+  fi
+
+  # 先校验语法。reload 自己也会校验，但分开做能把「配置文件写错了」和
+  # 「reload 本身失败」区分开，排错时少绕一圈。
+  if ! docker exec "$cid" nginx -t 2>&1 | sed 's/^/    /'; then
+    log "⚠️ nginx 配置校验未通过：代理继续使用当前配置（本次发布仍算成功）"
+    log "   排查：docker compose --env-file docker/.env -f docker/compose.prod.yaml exec nginx nginx -t"
+    return 0
+  fi
+
+  if docker exec "$cid" nginx -s reload 2>&1 | sed 's/^/    /'; then
+    log "已热加载反向代理配置（不断连接、不重启容器）"
+  else
+    log "⚠️ nginx reload 失败：代理继续使用当前配置"
+  fi
+}
+
 if [ "${1:-}" = "--status" ]; then
   log "当前版本：$(cat "$STATE_FILE" 2>/dev/null || echo '（无记录）')"
   compose ps
@@ -83,6 +125,7 @@ if wait_health; then
   # 这样下一次部署的回滚目标一定是最后一个真正跑起来的版本。
   printf '%s\n' "$NEW_TAG" > "$STATE_FILE"
   log "部署成功，当前版本：${NEW_TAG}"
+  reload_proxy
   exit 0
 fi
 

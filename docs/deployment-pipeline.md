@@ -64,10 +64,10 @@ git tag v0.1.6 && git push origin v0.1.6
 | `.github/workflows/ci.yml` | 日常 CI：`go test ./...`、`npm run lint/build` | 每次 push / PR |
 | `docker/Dockerfile` | 三阶段构建：前端 `npm run build` → 后端 `go build` → alpine 运行 | job 1 在 runner 上执行 |
 | `docker/compose.prod.yaml` | 生产编排：app 用**镜像**（不 build）、端口只绑 `127.0.0.1`、带 healthcheck 与资源上限、另有对外入口 nginx | 服务器上执行 |
-| `docker/nginx/conf.d/blog.conf` | 反向代理站点（当前 HTTP / 80）；同目录的 `https.conf.example` 是备案后改名启用的 HTTPS 站点 | nginx 容器启动或 `nginx -s reload` |
+| `docker/nginx/conf.d/blog.conf` | 反向代理站点（当前 HTTP / 80）；同目录的 `https.conf.example` 是备案后改名启用的 HTTPS 站点 | 容器启动或热加载（发布成功时自动执行，见 §3.4） |
 | `docker/nginx/snippets/blog-location.conf` | 反代与压缩的公共片段，80 与 443 两个站点共用一份 | 同上 |
 | `docker/nginx/certs/` | 证书目录，只读挂进容器；同目录 `.gitignore` 挡住私钥入库 | acme.sh 写入时 |
-| `scripts/deploy.sh` | 服务器侧部署脚本：拉镜像 → 重建容器 → 健康检查 → 失败回滚 | 由 SSH 调用 |
+| `scripts/deploy.sh` | 服务器侧部署脚本：拉镜像 → 重建容器 → 健康检查 → 失败回滚 / 成功热加载代理 | 由 SSH 调用 |
 | `docker/.env` | 服务器本地配置（数据库密码、JWT 密钥等），权限 600，**不进 git** | 容器创建时注入环境变量 |
 | `.deploy_state` | 服务器上的单行文件，记录**当前线上真的跑起来的** sha | 每次部署成功/回滚时读 |
 
@@ -204,10 +204,21 @@ wait_health()：最多 30 次 × 2 秒 = 60 秒
    │          ├─ wait_health() 复查
    │          └─ exit 1（即使回滚成功也退出 1）
    │
-   └─ 写 .deploy_state = NEW_TAG，exit 0
+   └─ 写 .deploy_state = NEW_TAG
+        │
+        ▼
+      reload_proxy()：nginx -t → nginx -s reload
+      （校验不过只报警告，不影响已在运行的配置）
+        │
+        ▼
+      exit 0
 ```
 
 **为什么只有健康检查通过才写 `.deploy_state`**：这样"当前版本"永远等于"最后一个真的跑起来了的版本"，回滚目标才可信。
+
+**为什么成功分支里要热加载反向代理**：反代配置是挂载进容器的**文件**，改文件不会让运行中的 nginx 读新内容，而 `up -d app` 也不会重建代理容器——不补这一步，"改了 nginx 配置但线上没反应"就成了每次都要靠人记得的坑。校验失败时只打警告并按成功退出：配置文件写错不该让一次正常的应用发布变红，而且 nginx 校验不过时**正在运行的配置会继续服务**，站点不受影响。
+
+**为什么失败/回滚分支不 reload**：一次失败发布里，磁盘上的 nginx 配置已经是"和新版本配套"的那份，但新版本被否掉了。这时保持代理沿用上一个已知可用的配置更合理。
 
 **退出码语义**：`exit 0` = 发布成功；`exit 1` = 本次发布失败（Actions 上变红）。**回滚成功也算失败**——新版本确实是坏的，不该显示绿色。
 
@@ -258,6 +269,7 @@ docker images | grep crpi-                 # 先看本地有哪些版本
 bash scripts/deploy.sh <上一个 sha12>
 
 # —— 改了反向代理配置之后 ——
+# 正常发布（tag 推送）会自动做完这两步，只有「改了配置但这次不发版」才需要手动执行：
 docker exec docker-nginx-1 nginx -t          # 先验语法，别直接 reload
 docker exec docker-nginx-1 nginx -s reload   # 热加载：不断连接、不重启容器
 
@@ -313,7 +325,8 @@ curl -fsS http://127.0.0.1/health             # 经过代理，验证转发链�
 | **每次发版后页面 502，等一会儿又好了** | nginx 记住了 app 容器的**旧 IP**（容器重建后 IP 会变） | 确认 `blog-location.conf` 里用的是 `set $blog_upstream` + `resolver`，不是写死的 `upstream` 块 |
 | 上传图片报 413 | nginx 的 `client_max_body_size` 小于应用上限 | 调大（现为 10m，应用上限 5MiB） |
 | 静态资源没被压缩 | `gzip_types` 少了 `text/javascript` | 这个应用的 `.js` 返回 `text/javascript`（Go 1.20 起 MIME 改了），只写 `application/javascript` 压不到任何 JS。判据：响应头无 `Content-Encoding: gzip` 且 `Content-Length` 等于原始大小 |
-| 改了配置文件但没生效 | 只改了文件、没 reload；或改的是 `https.conf.example` | `docker exec docker-nginx-1 nginx -s reload`；`.example` 后缀不会被加载 |
+| 改了配置文件但没生效 | 改的是 `https.conf.example`（不会被加载）；或这次没发版、也没手动 reload | 改成 `https.conf`；单独改配置时执行 `docker exec docker-nginx-1 nginx -s reload` |
+| 发布日志里出现 `⚠️ nginx 配置校验未通过` | 新改的 nginx 配置有语法错 | 发布本身是成功的、站点也在正常服务（旧配置仍在跑）。按日志里给的命令看完整报错，修好后重发一次 |
 
 ---
 
@@ -346,9 +359,9 @@ curl -fsS http://127.0.0.1/health            # 经代理访问，应返回 {"cod
 
 ⚠️ 别顺手把 8080 / 8081 / 3306 一起开出去——它们只在 `127.0.0.1` 监听是有意设计。
 
-### 8.2 为什么 nginx 不参与发布流程
+### 8.2 nginx 和发布流程的关系
 
-`deploy.sh` 只执行 `compose pull app` + `compose up -d app`，不碰 nginx。好处是发版不会重建代理、不会中断已建立的连接，也不会丢掉 TLS 会话。代价是**改了代理配置要单独 reload**（见 §5）。
+`deploy.sh` 只执行 `compose pull app` + `compose up -d app`，不重建 nginx。好处是发版不会中断已建立的连接、不会丢掉 TLS 会话。配置文件的改动由发布流程末尾的 `reload_proxy()` 用**热加载**补上（`nginx -t` 校验 + `nginx -s reload`，同样不断连接、不重启容器）——所以「改了配置不生效」这件事不需要人记。
 
 ### 8.3 "发版后 502" 这个坑（本配置已经绕过）
 
@@ -409,7 +422,7 @@ docker exec docker-nginx-1 nginx -s reload
 - **健康检查后才认账** —— "发布成功"的定义是应用真的能响应，而不是容器启动了。
 - **端口只绑 `127.0.0.1`** —— 应用与数据库都不直接暴露公网，对外统一走 nginx（§8）。
 - **反向代理用 nginx 而不是 Caddy** —— Caddy 的自动 HTTPS 确实更省事，但 nginx 的配置知识是通用技能、资料和排错答案也远多于 Caddy。证书这一步用 acme.sh 补上，多花的只是一个续期任务（§8.4）。
-- **代理不参与发布流程** —— 发版只重建 app，代理保持不动，避免"改一次代码顺手把入口也重启了"。
+- **代理容器不随发版重建，但配置会随发版生效** —— 发版只重建 app（不中断连接、不丢 TLS 会话），代理配置的改动则在发布成功分支用热加载补上（§3.4）。既避免了"改代码顺手把入口重启了"，也避免了"改了入口配置却没人记得让它生效"。
 
 **回滚的边界（要理解，别期待它万能）**
 
